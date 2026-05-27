@@ -1,0 +1,286 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenthub.dev/schemas/ws_messages.json",
+  "title": "AgentHub WebSocket Messages",
+  "description": "SSOT contract for bidirectional WebSocket communication protocol",
+  "$definitions": {
+    "c2s_ping": {
+      "type": "object",
+      "required": ["type", "timestamp"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "ping",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Client send timestamp in ISO 8601"
+        }
+      },
+      "additionalProperties": false
+    },
+    "c2s_send_message": {
+      "type": "object",
+      "required": ["type", "timestamp", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "sendMessage",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Client send timestamp in ISO 8601"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "content"],
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Target session ID"
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1,
+              "description": "User message content"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "c2s_trigger_action": {
+      "type": "object",
+      "required": ["type", "timestamp", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "triggerAction",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Client send timestamp in ISO 8601"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["messageId", "actionType"],
+          "properties": {
+            "messageId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Target message ID containing the action"
+            },
+            "actionType": {
+              "type": "string",
+              "enum": ["applyDiff", "retry", "pin"],
+              "description": "Action type triggered by user"
+            },
+            "payload": {
+              "type": "object",
+              "description": "Variable-length action parameters"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "s2c_pong": {
+      "type": "object",
+      "required": ["type", "timestamp"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "pong",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server response timestamp in ISO 8601"
+        }
+      },
+      "additionalProperties": false
+    },
+    "s2c_agent_status": {
+      "type": "object",
+      "required": ["type", "timestamp", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "agentStatus",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server push timestamp in ISO 8601"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "agentId", "status", "displayText"],
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Session context"
+            },
+            "agentId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Agent reporting status"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["analyzing", "executing", "completed", "failed"],
+              "description": "Current agent execution status"
+            },
+            "displayText": {
+              "type": "string",
+              "description": "Human-readable status message"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "s2c_message_chunk": {
+      "type": "object",
+      "required": ["type", "timestamp", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "messageChunk",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server push timestamp in ISO 8601"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["messageId", "sessionId", "agentId", "chunkType", "deltaContent", "chunkIndex", "isFinal"],
+          "properties": {
+            "messageId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Unique message identifier for chunk assembly"
+            },
+            "sessionId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Session context"
+            },
+            "agentId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Agent generating this chunk"
+            },
+            "chunkType": {
+              "type": "string",
+              "enum": ["text", "code_diff", "web_preview", "deploy_status"],
+              "description": "Content type for frontend rendering dispatch"
+            },
+            "deltaContent": {
+              "type": "string",
+              "description": "Incremental text content for this chunk"
+            },
+            "chunkIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Zero-based chunk sequence number"
+            },
+            "isFinal": {
+              "type": "boolean",
+              "description": "Whether this is the last chunk for this message"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "s2c_message_complete": {
+      "type": "object",
+      "required": ["type", "timestamp", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "messageComplete",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server push timestamp in ISO 8601"
+        },
+        "payload": {
+          "$ref": "entities.json#/$definitions/Message",
+          "description": "Complete Message entity from entities.json"
+        }
+      },
+      "additionalProperties": false
+    },
+    "s2c_error": {
+      "type": "object",
+      "required": ["type", "timestamp", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "error",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server push timestamp in ISO 8601"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "errorCode", "errorMessage", "recoverable"],
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Session context where error occurred"
+            },
+            "errorCode": {
+              "type": "string",
+              "description": "Machine-readable error classification"
+            },
+            "errorMessage": {
+              "type": "string",
+              "description": "Human-readable error description"
+            },
+            "recoverable": {
+              "type": "boolean",
+              "description": "Whether client can retry the operation"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$definitions/c2s_ping"},
+    {"$ref": "#/$definitions/c2s_send_message"},
+    {"$ref": "#/$definitions/c2s_trigger_action"},
+    {"$ref": "#/$definitions/s2c_pong"},
+    {"$ref": "#/$definitions/s2c_agent_status"},
+    {"$ref": "#/$definitions/s2c_message_chunk"},
+    {"$ref": "#/$definitions/s2c_message_complete"},
+    {"$ref": "#/$definitions/s2c_error"}
+  ]
+}
