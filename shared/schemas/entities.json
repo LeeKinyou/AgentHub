@@ -1,0 +1,286 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenthub.dev/schemas/entities.json",
+  "title": "AgentHub Core Entities",
+  "description": "SSOT contract for AgentProfile, Session, and Message entities",
+  "$definitions": {
+    "AgentProfile": {
+      "type": "object",
+      "required": ["id", "name", "role"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the agent"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name of the agent"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Avatar URL or built-in icon identifier"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["orchestrator", "expert"],
+          "description": "Agent role type"
+        },
+        "description": {
+          "type": "string",
+          "description": "Capability description for agent marketplace"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Session": {
+      "type": "object",
+      "required": ["id", "title", "type", "agentIds", "createdAt"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the session"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "Session title"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["single", "group"],
+          "description": "Session type: single chat or group chat"
+        },
+        "agentIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "Array of participating agent IDs"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp in ISO 8601 format"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DiffHunk": {
+      "type": "object",
+      "required": ["oldStart", "oldLines", "newStart", "newLines", "content"],
+      "properties": {
+        "oldStart": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Starting line number in the original file"
+        },
+        "oldLines": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of lines in the original file for this hunk"
+        },
+        "newStart": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Starting line number in the modified file"
+        },
+        "newLines": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of lines in the modified file for this hunk"
+        },
+        "content": {
+          "type": "string",
+          "description": "Diff content with +/- prefixes"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeployLogEntry": {
+      "type": "object",
+      "required": ["timestamp", "level", "message"],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Log entry timestamp in ISO 8601 format"
+        },
+        "level": {
+          "type": "string",
+          "enum": ["info", "warn", "error"],
+          "description": "Log severity level"
+        },
+        "message": {
+          "type": "string",
+          "description": "Log message content"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Message": {
+      "type": "object",
+      "required": ["id", "sessionId", "senderType", "senderId", "content", "contentType", "createdAt"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the message"
+        },
+        "sessionId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Foreign key to the parent session"
+        },
+        "senderType": {
+          "type": "string",
+          "enum": ["user", "agent"],
+          "description": "Type of the sender"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "User ID or Agent ID of the sender"
+        },
+        "content": {
+          "type": "string",
+          "description": "Text or markdown content"
+        },
+        "contentType": {
+          "type": "string",
+          "enum": ["text", "markdown", "card"],
+          "description": "Content type classification"
+        },
+        "cardData": {
+          "type": "object",
+          "description": "Structured artifact data, required when contentType is 'card'",
+          "properties": {
+            "codeBlock": {
+              "type": "object",
+              "description": "Static code snippet display",
+              "required": ["language", "code", "title"],
+              "properties": {
+                "language": {
+                  "type": "string",
+                  "description": "Programming language identifier"
+                },
+                "code": {
+                  "type": "string",
+                  "description": "Code content"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Code block title or filename"
+                }
+              },
+              "additionalProperties": false
+            },
+            "diffBlock": {
+              "type": "object",
+              "description": "Code diff artifact with hunks and apply status",
+              "required": ["filename", "language", "additions", "deletions", "hunks", "status"],
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "description": "Target file path"
+                },
+                "language": {
+                  "type": "string",
+                  "description": "Programming language for syntax highlighting"
+                },
+                "additions": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of added lines"
+                },
+                "deletions": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of deleted lines"
+                },
+                "hunks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$definitions/DiffHunk"
+                  },
+                  "description": "Array of diff hunks"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["pending", "applied", "rejected"],
+                  "description": "Current apply status of the diff"
+                }
+              },
+              "additionalProperties": false
+            },
+            "previewBlock": {
+              "type": "object",
+              "description": "Web preview artifact for iframe sandbox rendering",
+              "required": ["html", "viewport"],
+              "properties": {
+                "html": {
+                  "type": "string",
+                  "description": "HTML content for preview"
+                },
+                "css": {
+                  "type": "string",
+                  "description": "CSS styles for preview"
+                },
+                "js": {
+                  "type": "string",
+                  "description": "JavaScript for preview interactivity"
+                },
+                "viewport": {
+                  "type": "string",
+                  "enum": ["mobile", "tablet", "desktop"],
+                  "description": "Preview viewport preset"
+                }
+              },
+              "additionalProperties": false
+            },
+            "deployBlock": {
+              "type": "object",
+              "description": "Deployment status artifact with progress tracking",
+              "required": ["status", "progress", "logs"],
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["queued", "building", "deploying", "live", "failed"],
+                  "description": "Current deployment status"
+                },
+                "progress": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Deployment progress percentage"
+                },
+                "previewUrl": {
+                  "type": ["string", "null"],
+                  "description": "Live preview URL after successful deployment"
+                },
+                "logs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$definitions/DeployLogEntry"
+                  },
+                  "description": "Deployment log entries"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp in ISO 8601 format"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
