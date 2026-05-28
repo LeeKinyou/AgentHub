@@ -24,6 +24,49 @@ export const agents: AgentProfile[] = [
   },
 ];
 
+export const ARTIFACT_HTML = `<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+  .card { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 40px; text-align: center; color: #fff; box-shadow: 0 25px 50px rgba(0,0,0,0.3); transition: transform 0.3s; }
+  .card:hover { transform: translateY(-5px); }
+  .clock { font-size: 64px; font-weight: 200; letter-spacing: 4px; background: linear-gradient(90deg, #667eea, #764ba2, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 3s ease-in-out infinite; }
+  @keyframes shimmer { 0%,100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(90deg); } }
+  .label { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 8px; letter-spacing: 6px; text-transform: uppercase; }
+  .dots { display: flex; justify-content: center; gap: 8px; margin-top: 24px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; animation: pulse 1.5s ease-in-out infinite; }
+  .dot:nth-child(1) { background: #667eea; animation-delay: 0s; }
+  .dot:nth-child(2) { background: #764ba2; animation-delay: 0.3s; }
+  .dot:nth-child(3) { background: #f093fb; animation-delay: 0.6s; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.3); opacity: 1; } }
+  .btn { margin-top: 20px; padding: 10px 28px; border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; background: transparent; color: #fff; cursor: pointer; transition: all 0.3s; }
+  .btn:hover { background: rgba(255,255,255,0.1); border-color: #667eea; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="clock" id="clock">00:00:00</div>
+  <div class="label">Digital Clock</div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <button class="btn" onclick="document.querySelector('.clock').style.animationDuration = document.querySelector('.clock').style.animationDuration === '0.5s' ? '3s' : '0.5s'">✨ Toggle Speed</button>
+</div>
+<script>
+  function update() {
+    const d = new Date();
+    document.getElementById('clock').textContent =
+      [d.getHours(),d.getMinutes(),d.getSeconds()].map(v => String(v).padStart(2,'0')).join(':');
+  }
+  update(); setInterval(update, 1000);
+</script>
+</body>
+</html>`;
+
+export const ARTIFACT_PREFIX = '好的，我为你生成了一个炫酷的数字时钟 HTML 艺术品：\n\n```html\n';
+export const ARTIFACT_SUFFIX = '\n```\n\n你可以点击 Preview 标签页查看实时效果，支持鼠标交互！';
+
 export const sessions: Session[] = [
   {
     id: 'session-group-001',

@@ -3,6 +3,7 @@ export interface FileNode {
   type: 'file' | 'dir';
   children?: FileNode[];
   fileHandle?: FileSystemFileHandle;
+  dirHandle?: FileSystemDirectoryHandle;
 }
 
 export const rootA: FileNode = {

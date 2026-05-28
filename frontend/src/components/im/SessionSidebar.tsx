@@ -1,6 +1,7 @@
 'use client';
 
 import type { Session } from '@agenthub/shared/types/entities';
+import { AvatarStack } from './AvatarStack';
 
 interface SessionSidebarProps {
   sessions: Session[];
@@ -37,6 +38,9 @@ export function SessionSidebar({ sessions, activeId, onSelect, onPlusClick, onDe
               }`}
             >
               <div className="flex items-center gap-2">
+                {session.type === 'group' && session.agentIds.length > 0 && (
+                  <AvatarStack agentIds={session.agentIds} />
+                )}
                 <span className="truncate text-sm">{session.title}</span>
                 {session.type === 'group' && (
                   <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-zinc-300 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 rounded">

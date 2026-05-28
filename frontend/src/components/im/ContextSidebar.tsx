@@ -2,6 +2,7 @@
 
 import type { Project } from './mockProjects';
 import type { AgentProfile } from '@agenthub/shared/types/entities';
+import type { FileNode } from './mockFiles';
 import { FileExplorer } from './FileExplorer';
 import { SessionSidebar } from './SessionSidebar';
 
@@ -16,10 +17,12 @@ interface ContextSidebarProps {
   onPlusClick: () => void;
   onOpenFolder: () => void;
   onOpenFile: (name: string, handle: FileSystemFileHandle) => void;
+  onOpenFileTransient: (name: string, handle: FileSystemFileHandle) => void;
+  onFileAction: (action: 'create' | 'delete' | 'copy', node: FileNode, fileName?: string) => void;
   onDeleteSession: (sessionId: string) => void;
 }
 
-export function ContextSidebar({ project, activeSessionId, activeFileName, agents, width, onResizeStart, onSelectSession, onPlusClick, onOpenFolder, onOpenFile, onDeleteSession }: ContextSidebarProps) {
+export function ContextSidebar({ project, activeSessionId, activeFileName, agents, width, onResizeStart, onSelectSession, onPlusClick, onOpenFolder, onOpenFile, onOpenFileTransient, onFileAction, onDeleteSession }: ContextSidebarProps) {
   return (
     <aside className="relative h-screen bg-zinc-50 dark:bg-zinc-900/30 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shrink-0" style={{ width }}>
       <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
@@ -31,7 +34,7 @@ export function ContextSidebar({ project, activeSessionId, activeFileName, agent
             <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-600 uppercase tracking-wider">📁 Project Files</span>
           </div>
           <div className="h-[calc(100%-28px)] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-800">
-            <FileExplorer root={project.fileTree} activeFileName={activeFileName} onOpenFile={onOpenFile} onOpenFolder={onOpenFolder} />
+            <FileExplorer root={project.fileTree} activeFileName={activeFileName} onOpenFile={onOpenFile} onOpenFileTransient={onOpenFileTransient} onOpenFolder={onOpenFolder} onFileAction={onFileAction} />
           </div>
         </div>
         <div className="flex-1 overflow-hidden">

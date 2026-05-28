@@ -1,7 +1,7 @@
 # AgentHub - 项目整体进度与 Todo List
 
 > 最后更新：2026-05-28
-> 当前阶段：Phase 1 - 骨架搭建 & 单机 Vibe ✅ 已完成
+> 当前阶段：Phase 1.5 - 前端体验深化 ✅ 已完成
 
 ---
 
@@ -14,6 +14,10 @@
 - [x] **Phase 1: 骨架搭建 & 单机 Vibe** ── ✅ 已完成
   - 目标：仿飞书 IM 静态面板 + 文件系统读取 + 代码编辑器
   - 交付物：Next.js 四栏布局、FileExplorer、CodeEditor、Mentions、TabBar、Markdown 预览、Context Chips
+
+- [x] **Phase 1.5: 前端体验深化** ── ✅ 已完成
+  - 目标：交互体验打磨、持久化、拖拽联动、控制台、富媒体消息
+  - 交付物：LocalStorage 持久化、文件拖拽胶囊、右键菜单、控制台面板、Diff/Deploy 卡片、AvatarStack
 
 - [ ] **Phase 2: 单聊跑通 & 适配器层**
   - 目标：1v1 持久化流式聊天完整闭环
@@ -104,6 +108,57 @@
 - [x] 创建 `mockProjects.ts` 2 个项目（🚀 AgentHub / 🐍 QuantEngine）
 - [x] 创建 `mockFiles.ts` FileNode 接口定义
 
+### 2.3 [已完成] Phase 1.5 - 前端体验深化
+
+#### LocalStorage 持久化
+- [x] 创建 `useProjectState.ts` Hook 管理项目状态 + localStorage 延迟初始化
+- [x] 实现 `agenthub_projects` / `agenthub_active_project_id` / `agenthub_active_session_id` 三键持久化
+- [x] 实现 useEffect 副作用实时同步落盘
+- [x] 实现文件句柄失效防御（try/catch + NotAllowedError 优雅降级）
+- [x] 重构 `page.tsx` 从 242 行压缩至 123 行
+
+#### 文件拖拽联动
+- [x] 实现 FileExplorer 文件节点 `draggable` + `onDragStart` 设置 DataTransfer
+- [x] 实现 InputContextArea Drop 接收区 + 靛蓝虚线高亮视觉反馈
+- [x] 实现 ChatArea `handleDropFile` 回调 + 去重检查生成 ContextItem 胶囊
+
+#### 单击预览 / 双击固定 Tab
+- [x] 扩展 `EditorTab` 类型添加 `isTransient?: boolean` 字段
+- [x] 实现 TabBar 斜体淡化样式（`italic text-zinc-500/80`）+ 双击固定事件
+- [x] 实现 FileExplorer 单击触发 `onOpenFileTransient`（预览）、双击触发 `onOpenFile`（固定）
+- [x] 实现 `openTab` transient 模式覆写现有临时 Tab
+- [x] 实现 CodeEditor 编辑自愈（首次打字自动 `pinTab` 固定）
+
+#### 文件树右键上下文菜单
+- [x] 创建 `FileContextMenu.tsx` 右键菜单组件（新建/复制/删除）
+- [x] 实现 FileExplorer `onContextMenu` 事件拦截 + 菜单定位
+- [x] 实现自定义文件名输入模态框（替代 prompt()）
+- [x] 实现 `useProjectState.handleFileAction` 状态树 + 物理句柄双轨 CRUD
+
+#### 控制台日志面板
+- [x] 创建 `ConsolePanel.tsx` 控制台面板组件（TERMINAL LOGS）
+- [x] 实现日志分级高亮（error/success/warn/info）
+- [x] 实现智能触底 `scrollIntoView({ behavior: 'smooth' })`
+- [x] 实现 ProjectDock 控制台触发按钮 + 日志计数徽章
+- [x] 实现 page.tsx 日志自动采集（文件操作、聊天消息、系统事件）
+
+#### 多模态富媒体消息
+- [x] 创建 `InlineDiffCard.tsx` 内联 Diff 卡片（红绿对比代码 + Apply to File）
+- [x] 创建 `DeployStatusCard.tsx` 部署状态卡片（building/deploying/success + 进度条动画）
+- [x] 实现 ChatArea `contentType` 扩展支持 `diff_patch` / `deploy_status`
+- [x] 实现消息气泡 group-hover 操作按钮（📋 复制 / 📌 Pin）
+
+#### AvatarStack 群聊头像
+- [x] 创建 `AvatarStack.tsx` 群聊头像堆叠组件
+- [x] 实现 `-space-x-3` → `hover:space-x-1` 发散动画
+- [x] 实现 Agent ID → 渐变背景 + Emoji 映射表
+- [x] 集成至 SessionSidebar 群聊会话列表项
+
+#### 一键重置工作区
+- [x] 实现 ProjectDock 底部 Factory Reset 按钮（RotateCcw 图标）
+- [x] 实现向右向上弹出双重确认气泡
+- [x] 实现 `localStorage.clear()` + `window.location.reload()` 重置逻辑
+
 ---
 
 ## 3. 进度统计
@@ -112,10 +167,11 @@
 |------|---------|--------|------|
 | Phase 0 准备阶段 | 12 | 12 | 100% |
 | Phase 1 前端骨架 | 36 | 36 | 100% |
+| Phase 1.5 体验深化 | 32 | 32 | 100% |
 | Phase 2 单聊跑通 | 0 | 0 | 0% |
 | Phase 3 群聊编排 | 0 | 0 | 0% |
 | Phase 4 沙箱预览 | 0 | 0 | 0% |
-| **总计** | **48** | **48** | **100%** |
+| **总计** | **80** | **80** | **100%** |
 
 ---
 
@@ -127,9 +183,11 @@
 - **类型**：TypeScript 5.4 + JSON Schema 自动生成
 - **布局**：四栏指挥中心（ProjectDock + ContextSidebar + ChatArea + AgentSidebar）
 - **API**：File System Access API（真实文件读取/写入）
-- **Hooks**：useEditorTabs（多标签页管理）、useTheme（明暗主题持久化）
-- **编辑器**：CodeEditor + TabBar + Markdown 预览 + Diff 注入与合并
-- **交互**：@Mentions 提及 + / 快捷指令 + Context Chips 上下文胶囊
+- **Hooks**：useEditorTabs（多标签页管理）、useTheme（明暗主题持久化）、useProjectState（项目状态 + localStorage）
+- **编辑器**：CodeEditor + TabBar + Markdown 预览 + Diff 注入与合并 + 单击预览/双击固定
+- **交互**：@Mentions 提及 + / 快捷指令 + Context Chips 上下文胶囊 + 文件拖拽联动
+- **面板**：ConsolePanel（TERMINAL LOGS 控制台日志）
+- **富媒体**：InlineDiffCard + DeployStatusCard + AvatarStack
 
 ### 后端（待实现）
 - **框架**：FastAPI + Python 3.11
