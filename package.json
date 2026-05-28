@@ -1,0 +1,13 @@
+{
+  "name": "agenthub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-Agent collaboration platform with IM chat paradigm",
+  "scripts": {
+    "codegen": "node shared/scripts/codegen.js",
+    "sync:schemas": "python backend/scripts/sync_schemas.py"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
