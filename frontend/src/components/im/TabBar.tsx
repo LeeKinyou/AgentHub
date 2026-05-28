@@ -7,6 +7,7 @@ interface TabBarProps {
   activeTabId: string | null;
   onSwitch: (id: string) => void;
   onClose: (id: string) => void;
+  onPinTab: (id: string) => void;
 }
 
 function getFileIcon(name: string): string {
@@ -19,21 +20,24 @@ function getFileIcon(name: string): string {
   return '📄';
 }
 
-export function TabBar({ tabs, activeTabId, onSwitch, onClose }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onSwitch, onClose, onPinTab }: TabBarProps) {
   return (
     <div className="h-9 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex items-end overflow-x-auto whitespace-nowrap scrollbar-hide w-full shrink-0">
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
+        const isTransient = tab.isTransient;
         return (
           <button
             key={tab.id}
             onClick={() => onSwitch(tab.id)}
+            onDoubleClick={() => onPinTab(tab.id)}
             className={`
               group relative inline-flex items-center gap-1.5 px-3 h-full max-w-[140px]
               text-xs font-mono transition-colors duration-150 border-r border-zinc-200 dark:border-zinc-800/50 flex-shrink-0
               ${isActive
                 ? 'bg-white dark:bg-zinc-950/40 text-zinc-800 dark:text-zinc-200 border-t-2 border-t-indigo-500'
                 : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800/40 border-t-2 border-t-transparent'}
+              ${isTransient ? 'italic text-zinc-500/80 dark:text-zinc-400/80' : ''}
             `}
           >
             <span className="text-[11px] shrink-0">{getFileIcon(tab.name)}</span>

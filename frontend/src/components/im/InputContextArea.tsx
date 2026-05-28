@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import type { AgentProfile } from '@agenthub/shared/types/entities';
 import { MentionList } from './MentionList';
@@ -9,24 +8,18 @@ export interface ContextItem {
   type: 'file' | 'agent' | 'snippet';
   name: string;
 }
-
-interface SlashCommand {
-  id: string;
-  label: string;
-  desc: string;
-}
-
+interface SlashCommand { id: string; label: string; desc: string; }
 const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'explain', label: '/explain', desc: '解释选中的上下文' },
   { id: 'bug', label: '/bug', desc: '诊断代码缺陷' },
   { id: 'test', label: '/test', desc: '自动编写单元测试' },
 ];
-
 interface InputContextAreaProps {
   agents: AgentProfile[];
   contextItems: ContextItem[];
   onRemoveContext: (id: string) => void;
   onSend: (text: string) => void;
+  onDropFile?: (fileName: string) => void;
 }
 
 function ContextChipsBar({ items, onRemove }: { items: ContextItem[]; onRemove: (id: string) => void }) {
@@ -52,18 +45,17 @@ function ContextChipsBar({ items, onRemove }: { items: ContextItem[]; onRemove: 
   );
 }
 
-export function InputContextArea({ agents, contextItems, onRemoveContext, onSend }: InputContextAreaProps) {
+export function InputContextArea({ agents, contextItems, onRemoveContext, onSend, onDropFile }: InputContextAreaProps) {
   const [text, setText] = useState('');
   const [mentionKey, setMentionKey] = useState('');
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const [mentionIdx, setMentionIdx] = useState(0);
   const [isSlashOpen, setIsSlashOpen] = useState(false);
   const [slashIdx, setSlashIdx] = useState(0);
+  const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
   const filteredAgents = agents.filter((a) => a.name.toLowerCase().includes(mentionKey.toLowerCase()));
   const filteredCmds = SLASH_COMMANDS.filter((c) => c.label.includes(text.match(/\/\w*$/)?.[0] ?? ''));
-
   useEffect(() => {
     const mentionMatch = text.match(/@(\w*)$/);
     const slashMatch = text.match(/^\/\w*$/);
@@ -72,19 +64,16 @@ export function InputContextArea({ agents, contextItems, onRemoveContext, onSend
     if (slashMatch && !mentionMatch) { setIsSlashOpen(true); setSlashIdx(0); }
     else { setIsSlashOpen(false); }
   }, [text]);
-
   const handleSelectMention = (agent: AgentProfile) => {
     setText((prev) => prev.replace(/@\w*$/, `@${agent.name} `));
     setIsMentionOpen(false);
     textareaRef.current?.focus();
   };
-
   const handleSelectSlash = (cmd: SlashCommand) => {
     setText(cmd.label + ' ');
     setIsSlashOpen(false);
     textareaRef.current?.focus();
   };
-
   const handleKeyDown = (e: KeyboardEvent) => {
     if (isMentionOpen && filteredAgents.length > 0) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx((i) => Math.min(i + 1, filteredAgents.length - 1)); return; }
@@ -98,15 +87,22 @@ export function InputContextArea({ agents, contextItems, onRemoveContext, onSend
       if (e.key === 'Enter') { e.preventDefault(); handleSelectSlash(filteredCmds[slashIdx]); return; }
       if (e.key === 'Escape') { setIsSlashOpen(false); return; }
     }
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const trimmed = text.trim();
-      if (trimmed) { onSend(trimmed); setText(''); }
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const trimmed = text.trim(); if (trimmed) { onSend(trimmed); setText(''); } }
   };
-
   return (
-    <div className="relative p-4 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
+    <div
+      className={`relative p-4 border-t shrink-0 transition-colors duration-200 ${
+        isDragOver ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/50 dark:bg-indigo-500/5' : 'border-zinc-200 dark:border-zinc-800'
+      }`}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => { e.preventDefault(); setIsDragOver(false); const name = e.dataTransfer.getData('text/plain'); if (name && onDropFile) onDropFile(name); }}
+    >
+      {isDragOver && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-indigo-400 dark:border-indigo-500 bg-indigo-50/80 dark:bg-indigo-500/10 z-40 pointer-events-none">
+          <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">📄 释放以附加文件</span>
+        </div>
+      )}
       {isSlashOpen && filteredCmds.length > 0 && (
         <div className="absolute bottom-full left-4 mb-2 w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl overflow-hidden z-50">
           <div className="px-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800">
@@ -124,7 +120,7 @@ export function InputContextArea({ agents, contextItems, onRemoveContext, onSend
       <MentionList agents={filteredAgents} isOpen={isMentionOpen} highlightIndex={mentionIdx} onSelect={handleSelectMention} />
       <ContextChipsBar items={contextItems} onRemove={onRemoveContext} />
       <p className="text-[11px] text-zinc-400 dark:text-zinc-600 mb-2">
-        @ 唤醒智能体 · / 快捷指令 · Enter 发送 · Shift+Enter 换行
+        @ 唤醒智能体 · / 快捷指令 · 拖拽文件附加 · Enter 发送
       </p>
       <div className="flex gap-2">
         <textarea

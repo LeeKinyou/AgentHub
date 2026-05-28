@@ -12,6 +12,7 @@ interface CodeEditorProps {
   onClose: (id: string) => void;
   onChange: (id: string, content: string) => void;
   onSave: (tab: EditorTab) => void;
+  onPinTab: (tabId: string) => void;
   onAcceptDiff: (tabId: string) => void;
   onRejectDiff: (tabId: string) => void;
 }
@@ -64,7 +65,7 @@ function DiffView({ tab, onAccept, onReject }: { tab: EditorTab; onAccept: () =>
   );
 }
 
-function EditorContent({ tab, onChange, onSave }: { tab: EditorTab; onChange: (c: string) => void; onSave: () => void }) {
+function EditorContent({ tab, onChange, onSave, onPinTab }: { tab: EditorTab; onChange: (c: string) => void; onSave: () => void; onPinTab: () => void }) {
   const isMarkdown = tab.name.endsWith('.md');
   const [isPreview, setIsPreview] = useState(false);
 
@@ -75,6 +76,11 @@ function EditorContent({ tab, onChange, onSave }: { tab: EditorTab; onChange: (c
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onSave]);
+
+  const handleChange = (value: string) => {
+    if (tab.isTransient) onPinTab();
+    onChange(value);
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -103,22 +109,22 @@ function EditorContent({ tab, onChange, onSave }: { tab: EditorTab; onChange: (c
           })}
         </div>
       ) : (
-        <textarea value={tab.content} onChange={(e) => onChange(e.target.value)} className="flex-1 font-mono select-text bg-zinc-50 dark:bg-zinc-950/20 text-zinc-800 dark:text-zinc-300 w-full h-full p-4 resize-none focus:outline-none whitespace-pre overflow-auto scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700" spellCheck={false} />
+        <textarea value={tab.content} onChange={(e) => handleChange(e.target.value)} className="flex-1 font-mono select-text bg-zinc-50 dark:bg-zinc-950/20 text-zinc-800 dark:text-zinc-300 w-full h-full p-4 resize-none focus:outline-none whitespace-pre overflow-auto scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700" spellCheck={false} />
       )}
     </div>
   );
 }
 
-export function CodeEditor({ tabs, activeTab, activeTabId, onSwitch, onClose, onChange, onSave, onAcceptDiff, onRejectDiff }: CodeEditorProps) {
+export function CodeEditor({ tabs, activeTab, activeTabId, onSwitch, onClose, onChange, onSave, onPinTab, onAcceptDiff, onRejectDiff }: CodeEditorProps) {
   if (tabs.length === 0) return <EmptyState />;
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <TabBar tabs={tabs} activeTabId={activeTabId} onSwitch={onSwitch} onClose={onClose} />
+      <TabBar tabs={tabs} activeTabId={activeTabId} onSwitch={onSwitch} onClose={onClose} onPinTab={onPinTab} />
       {activeTab ? (
         activeTab.isDiffMode ? (
           <DiffView tab={activeTab} onAccept={() => onAcceptDiff(activeTab.id)} onReject={() => onRejectDiff(activeTab.id)} />
         ) : (
-          <EditorContent key={activeTab.id} tab={activeTab} onChange={(c) => onChange(activeTab.id, c)} onSave={() => onSave(activeTab)} />
+          <EditorContent key={activeTab.id} tab={activeTab} onChange={(c) => onChange(activeTab.id, c)} onSave={() => onSave(activeTab)} onPinTab={() => onPinTab(activeTab.id)} />
         )
       ) : (
         <EmptyState />

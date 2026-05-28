@@ -13,6 +13,7 @@ export interface EditorTab {
   handle: FileSystemFileHandle;
   content: string;
   isDirty: boolean;
+  isTransient?: boolean;
   isDiffMode?: boolean;
   diffLines?: DiffLine[];
   originalContent?: string;
@@ -37,7 +38,7 @@ export function useEditorTabs() {
   );
 
   const openTab = useCallback(
-    async (projectId: string, name: string, handle: FileSystemFileHandle) => {
+    async (projectId: string, name: string, handle: FileSystemFileHandle, isTransient = false) => {
       const pt = getProjectTabs(projectId);
       const existing = pt.tabs.find((t) => t.handle === handle);
       if (existing) {
@@ -48,8 +49,19 @@ export function useEditorTabs() {
         const file = await handle.getFile();
         const content = await file.text();
         const id = crypto.randomUUID();
-        const newTab: EditorTab = { id, name, handle, content, isDirty: false };
-        setProjectsTabs((prev) => ({ ...prev, [projectId]: { tabs: [...pt.tabs, newTab], activeTabId: id } }));
+        const transientTab = pt.tabs.find((t) => t.isTransient && !t.isDirty);
+        const newTab: EditorTab = { id, name, handle, content, isDirty: false, isTransient };
+        if (transientTab) {
+          setProjectsTabs((prev) => ({
+            ...prev,
+            [projectId]: {
+              tabs: pt.tabs.map((t) => (t.id === transientTab.id ? { ...newTab, id: t.id } : t)),
+              activeTabId: transientTab.id,
+            },
+          }));
+        } else {
+          setProjectsTabs((prev) => ({ ...prev, [projectId]: { tabs: [...pt.tabs, newTab], activeTabId: id } }));
+        }
       } catch (err) {
         console.error('读取文件失败:', err);
       }
@@ -57,19 +69,13 @@ export function useEditorTabs() {
     [getProjectTabs],
   );
 
-  const closeTab = useCallback(
-    (projectId: string, tabId: string) => {
-      const pt = getProjectTabs(projectId);
-      const idx = pt.tabs.findIndex((t) => t.id === tabId);
-      const next = pt.tabs.filter((t) => t.id !== tabId);
-      let newActiveId = pt.activeTabId;
-      if (pt.activeTabId === tabId) {
-        newActiveId = next.length === 0 ? null : next[Math.min(idx, next.length - 1)].id;
-      }
-      setProjectsTabs((prev) => ({ ...prev, [projectId]: { tabs: next, activeTabId: newActiveId } }));
-    },
-    [getProjectTabs],
-  );
+  const closeTab = useCallback((projectId: string, tabId: string) => {
+    const pt = getProjectTabs(projectId);
+    const idx = pt.tabs.findIndex((t) => t.id === tabId);
+    const next = pt.tabs.filter((t) => t.id !== tabId);
+    const newActiveId = pt.activeTabId === tabId ? (next.length === 0 ? null : next[Math.min(idx, next.length - 1)].id) : pt.activeTabId;
+    setProjectsTabs((prev) => ({ ...prev, [projectId]: { tabs: next, activeTabId: newActiveId } }));
+  }, [getProjectTabs]);
 
   const setActiveTabId = useCallback((projectId: string, tabId: string) => {
     setProjectsTabs((prev) => ({ ...prev, [projectId]: { ...prev[projectId], activeTabId: tabId } }));
@@ -79,7 +85,15 @@ export function useEditorTabs() {
     setProjectsTabs((prev) => {
       const pt = prev[projectId];
       if (!pt) return prev;
-      return { ...prev, [projectId]: { ...pt, tabs: pt.tabs.map((t) => (t.id === tabId ? { ...t, content: newContent, isDirty: true } : t)) } };
+      return { ...prev, [projectId]: { ...pt, tabs: pt.tabs.map((t) => (t.id === tabId ? { ...t, content: newContent, isDirty: true, isTransient: false } : t)) } };
+    });
+  }, []);
+
+  const pinTab = useCallback((projectId: string, tabId: string) => {
+    setProjectsTabs((prev) => {
+      const pt = prev[projectId];
+      if (!pt) return prev;
+      return { ...prev, [projectId]: { ...pt, tabs: pt.tabs.map((t) => (t.id === tabId ? { ...t, isTransient: false } : t)) } };
     });
   }, []);
 
@@ -95,13 +109,7 @@ export function useEditorTabs() {
     setProjectsTabs((prev) => {
       const pt = prev[projectId];
       if (!pt) return prev;
-      return {
-        ...prev,
-        [projectId]: {
-          ...pt,
-          tabs: pt.tabs.map((t) => (t.id === tabId ? { ...t, isDiffMode: true, diffLines, originalContent: t.content } : t)),
-        },
-      };
+      return { ...prev, [projectId]: { ...pt, tabs: pt.tabs.map((t) => (t.id === tabId ? { ...t, isDiffMode: true, diffLines, originalContent: t.content } : t)) } };
     });
   }, []);
 
@@ -127,27 +135,13 @@ export function useEditorTabs() {
     setProjectsTabs((prev) => {
       const pt = prev[projectId];
       if (!pt) return prev;
-      return {
-        ...prev,
-        [projectId]: {
-          ...pt,
-          tabs: pt.tabs.map((t) => (t.id === tabId ? { ...t, isDiffMode: false, diffLines: undefined, originalContent: undefined } : t)),
-        },
-      };
+      return { ...prev, [projectId]: { ...pt, tabs: pt.tabs.map((t) => (t.id === tabId ? { ...t, isDiffMode: false, diffLines: undefined, originalContent: undefined } : t)) } };
     });
   }, []);
 
   return {
-    projectsTabs,
-    getProjectTabs,
-    activeProjectTabs,
-    openTab,
-    closeTab,
-    setActiveTabId,
-    updateTabContent,
-    setTabClean,
-    injectDiff,
-    applyDiff,
-    rejectDiff,
+    projectsTabs, getProjectTabs, activeProjectTabs,
+    openTab, closeTab, setActiveTabId, updateTabContent, pinTab, setTabClean,
+    injectDiff, applyDiff, rejectDiff,
   };
 }
