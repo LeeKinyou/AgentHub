@@ -1,7 +1,7 @@
 # AgentHub - 项目整体进度与 Todo List
 
-> 最后更新：2026-05-27
-> 当前阶段：Phase 1 - 骨架搭建 & 单机 Vibe
+> 最后更新：2026-05-28
+> 当前阶段：Phase 1 - 骨架搭建 & 单机 Vibe ✅ 已完成
 
 ---
 
@@ -13,7 +13,7 @@
 
 - [x] **Phase 1: 骨架搭建 & 单机 Vibe** ── ✅ 已完成
   - 目标：仿飞书 IM 静态面板 + 文件系统读取 + 代码编辑器
-  - 交付物：Next.js 四栏布局、FileExplorer、CodeEditor、Mentions
+  - 交付物：Next.js 四栏布局、FileExplorer、CodeEditor、Mentions、TabBar、Markdown 预览、Context Chips
 
 - [ ] **Phase 2: 单聊跑通 & 适配器层**
   - 目标：1v1 持久化流式聊天完整闭环
@@ -64,15 +64,21 @@
 #### 会话管理
 - [x] 创建 `SessionSidebar.tsx` 会话列表 + 紫色激活指示条 + "+" 按钮
 - [x] 创建 `CreateGroupModal.tsx` 创建群组模态弹窗 + Agent 卡片勾选
+- [x] 创建 `CreateSessionModal.tsx` 会话创建模态弹窗 + Agent 多选
 
 #### 消息渲染
 - [x] 创建 `MessageCard.tsx` 消息气泡 + CodeBlock 缩略标签
 - [x] 创建 `ArtifactPanel.tsx` 右侧代码大画布（行号 + 复制 + 应用更改）
+- [x] 创建 `ArtifactPreview.tsx` HTML/CSS/JS 实时预览（iframe sandbox）
+- [x] 创建 `CodeViewer.tsx` 代码高亮查看器
+- [x] 实现流式消息打字机效果（模拟 AI 逐字输出）
 
 #### 输入与交互
 - [x] 创建 `InputBar.tsx` 底部输入框 + 聚焦光晕效果
 - [x] 创建 `MentionList.tsx` @提及智能体悬浮面板
+- [x] 创建 `InputContextArea.tsx` 上下文胶囊（Context Chips）+ @Mentions + / 快捷指令
 - [x] 实现 @Mentions 正则检测 + 键盘导航 + Enter 确认
+- [x] 升级 Context Chips 视觉语义：Agent 暗紫色「🤖 提及」、File 暗灰色「📄 附件」、Hover 红色 × 删除
 
 #### 文件系统集成
 - [x] 创建 `fileSystemUtils.ts` File System Access API 工具函数
@@ -83,6 +89,15 @@
 #### 代码编辑器
 - [x] 创建 `CodeEditor.tsx` 可编辑 textarea + 💾 Save 按钮 + Ctrl/Cmd+S 快捷键
 - [x] 实现 `handleSaveFile` 通过 FileSystemFileHandle 写入本地磁盘
+- [x] 创建 `TabBar.tsx` 多标签页管理 + 横向溢出滚动 + flex-shrink-0 固定宽度
+- [x] 实现 `useEditorTabs` Hook（openTab / closeTab / updateTabContent / Diff 注入与合并）
+- [x] 实现 Markdown 实时预览切换（👁️ 按钮 + prose 渲染容器）
+- [x] 实现 Diff 视图（Accept/Reject 浮动操作栏 + 行级高亮）
+
+#### 主题与样式
+- [x] 创建 `ThemeToggle.tsx` 明暗主题切换按钮
+- [x] 实现 `useTheme` Hook（localStorage 持久化 + system 跟随 + class 切换）
+- [x] 实现可拖拽面板宽度调节（ContextSidebar + AgentSidebar）
 
 #### Mock 数据
 - [x] 创建 `mockData.ts` 3 个 Agent + 2 个 Session + 6 条消息（含 codeBlock 卡片）
@@ -96,11 +111,11 @@
 | 阶段 | 总任务数 | 已完成 | 进度 |
 |------|---------|--------|------|
 | Phase 0 准备阶段 | 12 | 12 | 100% |
-| Phase 1 前端骨架 | 22 | 22 | 100% |
+| Phase 1 前端骨架 | 36 | 36 | 100% |
 | Phase 2 单聊跑通 | 0 | 0 | 0% |
 | Phase 3 群聊编排 | 0 | 0 | 0% |
 | Phase 4 沙箱预览 | 0 | 0 | 0% |
-| **总计** | **34** | **34** | **100%** |
+| **总计** | **48** | **48** | **100%** |
 
 ---
 
@@ -109,9 +124,12 @@
 ### 前端
 - **框架**：Next.js 14 + React 18
 - **样式**：Tailwind CSS 3.4 + 暗黑 Zinc 色调
-- **类型**：TypeScript + JSON Schema 自动生成
+- **类型**：TypeScript 5.4 + JSON Schema 自动生成
 - **布局**：四栏指挥中心（ProjectDock + ContextSidebar + ChatArea + AgentSidebar）
 - **API**：File System Access API（真实文件读取/写入）
+- **Hooks**：useEditorTabs（多标签页管理）、useTheme（明暗主题持久化）
+- **编辑器**：CodeEditor + TabBar + Markdown 预览 + Diff 注入与合并
+- **交互**：@Mentions 提及 + / 快捷指令 + Context Chips 上下文胶囊
 
 ### 后端（待实现）
 - **框架**：FastAPI + Python 3.11

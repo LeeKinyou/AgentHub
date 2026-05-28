@@ -33,7 +33,21 @@ async function generateTypes() {
     console.log('✅ ws_messages.ts 生成成功');
 
     // 3. 生成统一入口 index.ts 供外部 pnpm workspace 引用
-    const indexContent = `export * from './types/entities';\nexport * from './types/ws_messages';\n`;
+    const indexContent = [
+      "export * from './types/entities';",
+      "export type {",
+      "  C2SPing,",
+      "  C2SSendMessage,",
+      "  C2STriggerAction,",
+      "  S2CPong,",
+      "  S2CAgentStatus,",
+      "  S2CMessageChunk,",
+      "  S2CMessageComplete,",
+      "  S2CError,",
+      "  WSMessage,",
+      "} from './types/ws_messages';",
+      "",
+    ].join('\n');
     fs.writeFileSync(path.join(__dirname, '../index.ts'), indexContent);
     console.log('✅ shared/index.ts 入口文件更新成功');
 
