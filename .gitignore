@@ -1,0 +1,132 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+wheels/
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.venv*/
+virtualenv/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# IDE - VSCode
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.code-workspace
+
+# IDE - PyCharm / JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+/out/
+.DS_Store
+
+# IDE - Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# IDE - Vim
+*.swp
+*.swo
+*~
+.vimrc
+*.bak
+
+# OS - macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# OS - Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# OS - Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# Node.js / Frontend
+node_modules/
+node_modules/.package-lock.json
+dist-ssr/
+*.local
+.cache/
+.parcel-cache/
+.nuxt/
+.output/
+.vercel
+.netlify
+*.tsbuildinfo
+
+# AgentHub specific
+.claude
+agenthub-data/
+temp/
+tmp/
+*.tmp
+.cache/
+downloads/
+uploads/
+
+# Redis dump
+dump.rdb
+
+# Generated documentation
+site/
+/_site/
