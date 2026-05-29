@@ -41,7 +41,9 @@ export function ProjectDock({ projects, activeProjectId, theme, logCount, isCons
       <div className="flex flex-col items-center gap-2">
         <div className="relative" ref={dropdownRef}>
           <button onClick={() => setIsDropdownOpen((prev) => !prev)}
-            className="w-12 h-12 rounded-2xl bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 flex items-center justify-center text-xl transition-all duration-150" title="打开项目">📂</button>
+            className="w-12 h-12 rounded-2xl bg-indigo-600/10 hover:bg-indigo-600/20 border border-dashed border-indigo-500/40 flex items-center justify-center text-xl transition-all duration-150" title="新建 / 打开项目">
+            <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          </button>
           {isDropdownOpen && (
             <div className="absolute left-14 top-0 z-50 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl py-1">
               <button onClick={() => { setIsDropdownOpen(false); onOpenProject(); }} className="w-full px-4 py-2.5 text-left text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2"><span>📂</span><span>打开本地项目</span></button>
@@ -50,10 +52,15 @@ export function ProjectDock({ projects, activeProjectId, theme, logCount, isCons
           )}
         </div>
         <div className="w-8 h-px bg-zinc-200 dark:bg-zinc-800 my-1" />
+        {projects.length === 0 && (
+          <div className="px-2 py-4 text-center">
+            <p className="text-[10px] text-zinc-500 leading-relaxed">点击上方<br />打开项目</p>
+          </div>
+        )}
         {projects.map((project) => (
           <div key={project.id} className="relative group">
             <button onClick={() => onSelectProject(project.id)}
-              className={`relative w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all duration-150 ${project.id === activeProjectId ? 'bg-zinc-300 dark:bg-zinc-800' : 'bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800'}`} title={project.name}>
+              className={`relative w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all duration-150 ${project.id === activeProjectId ? 'bg-zinc-300 dark:bg-zinc-800 ring-2 ring-indigo-500/50' : 'bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800'}`} title={project.name}>
               {project.id === activeProjectId && <div className="absolute left-0 w-1 h-8 bg-indigo-500 rounded-r" />}
               <span className="group-hover:scale-110 transition-transform duration-150">{project.icon}</span>
             </button>

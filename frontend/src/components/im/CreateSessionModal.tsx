@@ -8,15 +8,17 @@ interface CreateSessionModalProps {
   onClose: () => void;
   onConfirm: (selectedAgentIds: string[], sessionName: string) => void;
   availableAgents: AgentProfile[];
+  singleSelect?: boolean;
 }
 
-export function CreateSessionModal({ isOpen, onClose, onConfirm, availableAgents }: CreateSessionModalProps) {
+export function CreateSessionModal({ isOpen, onClose, onConfirm, availableAgents, singleSelect }: CreateSessionModalProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [name, setName] = useState('');
 
   if (!isOpen) return null;
 
   const toggleAgent = (id: string) => {
+    if (singleSelect) { setSelectedIds((prev) => prev.includes(id) ? [] : [id]); return; }
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 

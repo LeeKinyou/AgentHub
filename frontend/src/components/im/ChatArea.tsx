@@ -9,6 +9,7 @@ import { ArtifactPanel } from './ArtifactPanel';
 import { ArtifactPreview } from './ArtifactPreview';
 import { InlineDiffCard } from './InlineDiffCard';
 import { DeployStatusCard } from './DeployStatusCard';
+import { ConsolePanel, type LogItem } from './ConsolePanel';
 
 interface StreamMessage extends Omit<Message, 'contentType'> {
   isStreaming?: boolean;
@@ -22,15 +23,16 @@ interface ChatAreaProps {
   agents: AgentProfile[];
   isRightPanelOpen: boolean;
   activeTabId: string | null;
+  contextItems: ContextItem[];
+  onContextItemsChange: (items: ContextItem[]) => void;
   onToggleRightPanel: () => void;
   onSend: (text: string) => void;
   onApplyDiff: (diffLines: DiffLine[]) => void;
+  isConsoleOpen: boolean;
+  logs: LogItem[];
+  onClearConsole: () => void;
+  onCloseConsole: () => void;
 }
-
-const MOCK_CONTEXTS: ContextItem[] = [
-  { id: 'ctx-1', type: 'agent', name: 'Codex' },
-  { id: 'ctx-2', type: 'file', name: 'eval_llm.py' },
-];
 
 function parseHtmlBlock(content: string): string | null {
   const match = content.match(/```html\n([\s\S]*?)```/);
@@ -98,33 +100,35 @@ function MessageBubble({ msg, agents, activeTabId, onApplyDiff }: { msg: StreamM
   );
 }
 
-export function ChatArea({ session, messages, agents, isRightPanelOpen, activeTabId, onToggleRightPanel, onSend, onApplyDiff }: ChatAreaProps) {
+export function ChatArea({ session, messages, agents, isRightPanelOpen, activeTabId, contextItems, onContextItemsChange, onToggleRightPanel, onSend, onApplyDiff, isConsoleOpen, logs, onClearConsole, onCloseConsole }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [activeCode, setActiveCode] = useState<CodeBlock | null>(null);
-  const [contextItems, setContextItems] = useState<ContextItem[]>(MOCK_CONTEXTS);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const handleDropFile = (fileName: string) => {
-    setContextItems((prev) => {
-      if (prev.some((i) => i.type === 'file' && i.name === fileName)) return prev;
-      return [...prev, { id: `file-${crypto.randomUUID()}`, type: 'file', name: fileName }];
-    });
+    if (contextItems.some((i) => i.type === 'file' && i.name === fileName)) return;
+    onContextItemsChange([...contextItems, { id: `file-${crypto.randomUUID()}`, type: 'file', name: fileName }]);
+  };
+
+  const handleRemoveContext = (id: string) => {
+    onContextItemsChange(contextItems.filter((i) => i.id !== id));
   };
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-zinc-50 dark:bg-zinc-950">
       <ChatHeader title={session.title} sessionType={session.type} agents={agents} isRightPanelOpen={isRightPanelOpen} onToggleRightPanel={onToggleRightPanel} />
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-800">
             {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} agents={agents} activeTabId={activeTabId} onApplyDiff={onApplyDiff} />)}
             <div ref={bottomRef} />
           </div>
-          <InputContextArea agents={agents} contextItems={contextItems} onRemoveContext={(id) => setContextItems((prev) => prev.filter((i) => i.id !== id))} onSend={onSend} onDropFile={handleDropFile} />
+          <InputContextArea agents={agents} contextItems={contextItems} onRemoveContext={handleRemoveContext} onSend={onSend} onDropFile={handleDropFile} />
         </div>
         <ArtifactPanel codeBlock={activeCode} onClose={() => setActiveCode(null)} />
       </div>
+      <ConsolePanel isOpen={isConsoleOpen} logs={logs} onClear={onClearConsole} onClose={onCloseConsole} />
     </main>
   );
 }
