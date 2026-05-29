@@ -19,7 +19,7 @@ class WSAgentStatus(BaseModel):
     type: str = "agentStatus"
     session_id: UUID
     agent_id: str
-    status: str  # analyzing | executing | completed | failed
+    status: str  # analyzing | executing | completed | failed | online | offline | busy | error
     display_text: str
 
 

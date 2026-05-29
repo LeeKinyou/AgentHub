@@ -35,6 +35,7 @@ def _verify_and_apply(
     old_lines: int,
     content: str,
     hunk_idx: int,
+    old_content: str | None = None,
 ) -> list[str]:
     """Verify the old content matches, then splice in the new content.
 
@@ -50,6 +51,16 @@ def _verify_and_apply(
             f"out of bounds for file with {len(lines)} lines"
         )
 
+    # --- content verification ---
+    # If oldContent is provided, verify it matches the actual file content
+    if old_content is not None:
+        actual_content = "".join(lines[begin:end])
+        if actual_content != old_content:
+            raise DiffConflictError(
+                f"Hunk #{hunk_idx}: old content mismatch at lines [{old_start}, {old_start + old_lines}). "
+                f"Expected:\n{old_content[:200]}...\nActual:\n{actual_content[:200]}..."
+            )
+
     # Build expected new lines from the hunk content.
     # splitlines(keepends=True) preserves line endings inside the content.
     new_content_lines = content.splitlines(keepends=True)
@@ -58,21 +69,6 @@ def _verify_and_apply(
     # middle of a file, keep the original line ending of the last replaced line.
     if new_content_lines and not content.endswith("\n") and end < len(lines):
         new_content_lines[-1] = new_content_lines[-1].rstrip("\n\r") + lines[end - 1][len(lines[end - 1].lstrip("\n\r")):]
-
-    # --- content verification ---
-    # We compare the existing lines against what the hunk expects to replace.
-    # The hunk's "content" field is the *new* code; we cannot verify the old
-    # code from it.  However we can detect obviously wrong ranges: if the
-    # hunk declares oldLines > 0 but the region is empty, or if the hunk
-    # overlaps with a previously-applied hunk (detected via stale content).
-    #
-    # A stricter verification would require the hunk to carry old content,
-    # but the current schema only has "content" (the replacement).  So we
-    # do a sanity check on the range and trust the caller for content.
-    #
-    # For overlapping hunks (applied in reverse order so line numbers stay
-    # valid), we track which lines have already been touched.
-    # This is handled by the caller via _check_overlap.
 
     lines[begin:end] = new_content_lines
     return lines
@@ -172,6 +168,7 @@ async def apply_diff(
         old_start = hunk.get("oldStart", 0)
         old_lines_count = hunk.get("oldLines", 0)
         content = hunk.get("content", "")
+        old_content = hunk.get("oldContent")  # Optional verification field
 
         # New-file hunk: oldStart == 0 means "insert at top"
         if old_start == 0 and old_lines_count == 0:
@@ -186,7 +183,7 @@ async def apply_diff(
             return False, msg
 
         try:
-            lines = _verify_and_apply(lines, old_start, old_lines_count, content, idx)
+            lines = _verify_and_apply(lines, old_start, old_lines_count, content, idx, old_content)
         except DiffConflictError as exc:
             msg = str(exc)
             logger.warning(msg)
