@@ -68,6 +68,8 @@ async def update_agent(agent_id: UUID, body: AgentProfileUpdate, db: AsyncSessio
         agent.system_prompt = body.system_prompt
     if body.agent_config is not None:
         agent.agent_config = body.agent_config.model_dump()
+    if body.status is not None:
+        agent.status = body.status
     await db.flush()
     await db.refresh(agent)
     return ApiResponse(data=AgentProfileRead.model_validate(agent))
