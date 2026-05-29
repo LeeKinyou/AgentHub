@@ -94,6 +94,17 @@ export function useProjectState() {
     setActiveSessionId(newSession.id);
   }, [activeProjectId]);
 
+  const handleCreateGroup = useCallback((title: string, selectedAgentIds: string[]) => {
+    if (!activeProjectId) return;
+    const newSession: Session = {
+      id: crypto.randomUUID(), title,
+      type: 'group',
+      agentIds: selectedAgentIds, createdAt: new Date().toISOString(),
+    };
+    setProjects((prev) => prev.map((p) => (p.id === activeProjectId ? { ...p, sessions: [...p.sessions, newSession] } : p)));
+    setActiveSessionId(newSession.id);
+  }, [activeProjectId]);
+
   const updateFileTree = useCallback((updater: (tree: FileNode) => FileNode) => {
     if (!activeProjectId) return;
     setRealFileTrees((prev) => {
@@ -150,6 +161,6 @@ export function useProjectState() {
   return {
     projects, activeProjectId, activeSessionId, activeProject, activeSession, activeFileTree,
     setActiveSessionId, setRealFileTrees, handleSelectProject, handleDeleteProject,
-    handleDeleteSession, handleOpenProject, handleNewProject, handleOpenFile, handleCreateSession, handleFileAction,
+    handleDeleteSession, handleOpenProject, handleNewProject, handleOpenFile, handleCreateSession, handleCreateGroup, handleFileAction,
   };
 }

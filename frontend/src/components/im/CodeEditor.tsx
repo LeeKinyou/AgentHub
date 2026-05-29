@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type { EditorTab } from '@/hooks/useEditorTabs';
 import { TabBar } from './TabBar';
 
@@ -98,15 +99,28 @@ function EditorContent({ tab, onChange, onSave, onPinTab }: { tab: EditorTab; on
       </div>
       {isMarkdown && isPreview ? (
         <div className="prose dark:prose-invert max-w-none p-6 overflow-y-auto h-full bg-white dark:bg-zinc-950 text-sm leading-relaxed">
-          {tab.content.split('\n').map((line, i) => {
-            if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold mt-4 mb-2">{line.slice(2)}</h1>;
-            if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-semibold mt-3 mb-1.5">{line.slice(3)}</h2>;
-            if (line.startsWith('### ')) return <h3 key={i} className="text-base font-medium mt-2 mb-1">{line.slice(4)}</h3>;
-            if (line.startsWith('- ')) return <li key={i} className="ml-4 list-disc">{line.slice(2)}</li>;
-            if (line.startsWith('```')) return <div key={i} className="my-1 px-3 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded text-xs text-zinc-500 font-mono">{line}</div>;
-            if (line.trim() === '') return <br key={i} />;
-            return <p key={i} className="mb-1">{line}</p>;
-          })}
+          <ReactMarkdown
+            components={{
+              pre({ children, ...props }) {
+                const codeChild = children as any;
+                if (codeChild?.props?.className?.includes('language-mermaid')) {
+                  const codeValue = String(codeChild.props.children || '').replace(/\n$/, '');
+                  return (
+                    <div className="my-4 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-zinc-50 dark:bg-zinc-900 p-4 font-mono text-xs">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                        <span>📊 Mermaid Diagram</span>
+                        <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-500">Preview Mode</span>
+                      </div>
+                      <pre className="overflow-x-auto text-zinc-600 dark:text-zinc-400">{codeValue}</pre>
+                    </div>
+                  );
+                }
+                return <pre {...props}>{children}</pre>;
+              },
+            }}
+          >
+            {tab.content}
+          </ReactMarkdown>
         </div>
       ) : (
         <textarea value={tab.content} onChange={(e) => handleChange(e.target.value)} className="flex-1 font-mono select-text bg-zinc-50 dark:bg-zinc-950/20 text-zinc-800 dark:text-zinc-300 w-full h-full p-4 resize-none focus:outline-none whitespace-pre overflow-auto scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700" spellCheck={false} />
