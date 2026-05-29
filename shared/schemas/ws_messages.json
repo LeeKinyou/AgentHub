@@ -140,8 +140,8 @@
             },
             "status": {
               "type": "string",
-              "enum": ["analyzing", "executing", "completed", "failed"],
-              "description": "Current agent execution status"
+              "enum": ["analyzing", "executing", "completed", "failed", "online", "offline", "busy", "error"],
+              "description": "Current agent execution or connection status"
             },
             "displayText": {
               "type": "string",
