@@ -70,7 +70,6 @@ coverage.xml
 *.ipr
 *.iws
 /out/
-.DS_Store
 
 # IDE - Sublime Text
 *.sublime-workspace
@@ -115,6 +114,10 @@ dist-ssr/
 *.tsbuildinfo
 .next/
 
+# Next.js
+.next/
+out/
+
 # AgentHub specific
 .claude
 agenthub-data/
@@ -131,3 +134,7 @@ dump.rdb
 # Generated documentation
 site/
 /_site/
+
+# Misc
+*.tgz
+coverage/
