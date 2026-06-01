@@ -9,6 +9,7 @@ class DiffHunk(BaseModel):
     newStart: int
     newLines: int
     content: str
+    oldContent: str | None = None  # Expected old content for verification
 
 
 class CodeBlock(BaseModel):

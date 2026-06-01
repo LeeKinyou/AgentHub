@@ -31,6 +31,12 @@
         "description": {
           "type": "string",
           "description": "Capability description for agent marketplace"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["online", "offline", "busy", "error"],
+          "default": "offline",
+          "description": "Current agent status"
         }
       },
       "additionalProperties": false
@@ -96,7 +102,11 @@
         },
         "content": {
           "type": "string",
-          "description": "Diff content with +/- prefixes"
+          "description": "New content to replace the old lines"
+        },
+        "oldContent": {
+          "type": "string",
+          "description": "Expected old content for verification before applying"
         }
       },
       "additionalProperties": false

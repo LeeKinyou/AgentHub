@@ -21,4 +21,5 @@ class AgentProfile(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     agent_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # Custom agent config: tools, skills, mcp
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="offline")  # online | offline | busy | error
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

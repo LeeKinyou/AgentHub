@@ -112,6 +112,7 @@ dist-ssr/
 .vercel
 .netlify
 *.tsbuildinfo
+.next/
 
 # Next.js
 .next/

@@ -34,6 +34,7 @@ class AgentProfileUpdate(BaseModel):
     description: str | None = None
     system_prompt: str | None = None
     agent_config: AgentConfig | None = None
+    status: str | None = None  # online | offline | busy | error
 
 
 class AgentProfileRead(AgentProfileBase):
@@ -41,5 +42,6 @@ class AgentProfileRead(AgentProfileBase):
     user_id: UUID | None = None
     system_prompt: str | None = None
     agent_config: dict | None = None
+    status: str = "offline"
 
     model_config = {"from_attributes": True}
