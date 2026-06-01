@@ -8,10 +8,13 @@ import { ChatArea } from '@/components/im/ChatArea';
 import { AgentSidebar } from '@/components/im/AgentSidebar';
 import { CodeEditor } from '@/components/im/CodeEditor';
 import type { LogItem } from '@/components/im/ConsolePanel';
+import { ConsolePanel } from '@/components/im/ConsolePanel';
 import type { ContextItem } from '@/components/im/InputContextArea';
 import { CreateSessionModal } from '@/components/im/CreateSessionModal';
 import { CreateGroupModal } from '@/components/im/CreateGroupModal';
-import { agents, messages as mockMessages, ARTIFACT_HTML, ARTIFACT_PREFIX, ARTIFACT_SUFFIX } from '@/components/im/mockData';
+import { SettingsModal } from '@/components/im/SettingsModal';
+import { agents as defaultAgents, messages as mockMessages, ARTIFACT_HTML, ARTIFACT_PREFIX, ARTIFACT_SUFFIX } from '@/components/im/mockData';
+import type { AgentProfile } from '@agenthub/shared/types/entities';
 import { getMockResponses, type MockMessage } from '@/mock/mockScripts';
 import { useEditorTabs } from '@/hooks/useEditorTabs';
 import { useTheme } from '@/hooks/useTheme';
@@ -42,6 +45,8 @@ export default function Home() {
   const [isFilesExpanded, setIsFilesExpanded] = useState(true);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isSingleChat, setIsSingleChat] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [allAgents, setAllAgents] = useState<AgentProfile[]>(defaultAgents);
   const [logs, setLogs] = useState<LogItem[]>(INITIAL_LOGS);
   const [contextItems, setContextItems] = useState<ContextItem[]>([]);
   const [contextWidth, setContextWidth] = useState(260);
@@ -52,7 +57,7 @@ export default function Home() {
   const currentTabs = activeProjectTabs(state.activeProjectId);
   const activeTab = currentTabs.tabs.find((t) => t.id === currentTabs.activeTabId) ?? null;
   const activeMessages = state.activeSessionId ? allMessages.filter((m) => m.sessionId === state.activeSessionId) : [];
-  const activeAgents = state.activeSession ? agents.filter((a) => state.activeSession!.agentIds.includes(a.id)) : [];
+  const activeAgents = state.activeSession ? allAgents.filter((a) => state.activeSession!.agentIds.includes(a.id)) : [];
 
   const addLog = useCallback((type: LogItem['type'], source: string, message: string) => {
     setLogs((prev) => [...prev, { id: crypto.randomUUID(), type, source, message, timestamp: new Date().toISOString() }]);
@@ -153,27 +158,33 @@ export default function Home() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200">
-      <ProjectDock projects={state.projects} activeProjectId={state.activeProjectId} theme={theme} logCount={logs.length} isConsoleOpen={isConsoleOpen} onSelectProject={handleSelectProjectAndExpand} onOpenProject={state.handleOpenProject} onNewProject={state.handleNewProject} onDeleteProject={state.handleDeleteProject} onThemeChange={setTheme} onToggleConsole={() => setIsConsoleOpen((p) => !p)} />
-      {state.activeProject && state.activeFileTree && (
-        <div className={`${isFilesExpanded ? 'w-60' : 'w-0'} h-full border-r border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all duration-200 shrink-0 bg-zinc-50 dark:bg-zinc-900/30`}>
-          <FileExplorer root={state.activeFileTree} activeFileName={activeTab?.name ?? null} onOpenFile={handleOpenFile} onOpenFileTransient={handleOpenFileTransient} onFileAction={state.handleFileAction} />
+      <ProjectDock projects={state.projects} activeProjectId={state.activeProjectId} theme={theme} onSelectProject={handleSelectProjectAndExpand} onOpenProject={state.handleOpenProject} onNewProject={state.handleNewProject} onDeleteProject={state.handleDeleteProject} onThemeChange={setTheme} onOpenSettings={() => setIsSettingsOpen(true)} />
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+        <div className="flex-1 flex min-h-0 w-full overflow-hidden">
+          {state.activeProject && state.activeFileTree && (
+            <div className={`${isFilesExpanded ? 'w-60' : 'w-0'} h-full border-r border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all duration-200 shrink-0 bg-zinc-50 dark:bg-zinc-900/30`}>
+              <FileExplorer root={state.activeFileTree} activeFileName={activeTab?.name ?? null} onOpenFile={handleOpenFile} onOpenFileTransient={handleOpenFileTransient} onFileAction={state.handleFileAction} />
+            </div>
+          )}
+          {state.activeProject && state.activeFileTree ? (
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="flex-1 flex min-h-0">
+                <ContextSidebar project={{ ...state.activeProject, fileTree: state.activeFileTree }} activeSessionId={state.activeSessionId} width={contextWidth} onResizeStart={handleResizeStart('context')} onSelectSession={state.setActiveSessionId} onPlusClick={openSingleChat} onOpenGroupModal={() => setIsGroupModalOpen(true)} onDeleteSession={state.handleDeleteSession} />
+                {state.activeSession ? (
+                  <ChatArea session={state.activeSession} messages={activeMessages} agents={activeAgents} isRightPanelOpen={isRightPanelOpen} activeTabId={currentTabs.activeTabId} contextItems={contextItems} onContextItemsChange={setContextItems} onToggleRightPanel={() => setIsRightPanelOpen((prev) => !prev)} onSend={handleSend} onApplyDiff={(diffLines) => { if (state.activeProjectId && currentTabs.activeTabId) injectDiff(state.activeProjectId, currentTabs.activeTabId, diffLines); setIsRightPanelOpen(true); }} />
+                ) : <EmptyState text="暂无活跃会话" sub="点击左侧 + 按钮创建新会话" />}
+                <AgentSidebar agents={activeAgents} isOpen={isRightPanelOpen} width={editorWidth} onResizeStart={handleResizeStart('editor')}>
+                  <CodeEditor tabs={currentTabs.tabs} activeTab={activeTab} activeTabId={currentTabs.activeTabId} onSwitch={(id) => state.activeProjectId && setActiveTabId(state.activeProjectId, id)} onClose={(id) => state.activeProjectId && closeTab(state.activeProjectId, id)} onChange={(id, content) => state.activeProjectId && updateTabContent(state.activeProjectId, id, content)} onSave={handleSaveFile} onPinTab={(tabId) => state.activeProjectId && pinTab(state.activeProjectId, tabId)} onAcceptDiff={(tabId) => state.activeProjectId && applyDiff(state.activeProjectId, tabId)} onRejectDiff={(tabId) => state.activeProjectId && rejectDiff(state.activeProjectId, tabId)} />
+                </AgentSidebar>
+              </div>
+            </div>
+          ) : <EmptyState text="未检测到活跃项目" sub="点击左上角 📂 图标开启你的 AI 协同工作区" />}
         </div>
-      )}
-      {state.activeProject && state.activeFileTree ? (
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 flex min-h-0">
-            <ContextSidebar project={{ ...state.activeProject, fileTree: state.activeFileTree }} activeSessionId={state.activeSessionId} width={contextWidth} onResizeStart={handleResizeStart('context')} onSelectSession={state.setActiveSessionId} onPlusClick={openSingleChat} onOpenGroupModal={() => setIsGroupModalOpen(true)} onDeleteSession={state.handleDeleteSession} />
-            {state.activeSession ? (
-              <ChatArea session={state.activeSession} messages={activeMessages} agents={activeAgents} isRightPanelOpen={isRightPanelOpen} activeTabId={currentTabs.activeTabId} contextItems={contextItems} onContextItemsChange={setContextItems} onToggleRightPanel={() => setIsRightPanelOpen((prev) => !prev)} onSend={handleSend} onApplyDiff={(diffLines) => { if (state.activeProjectId && currentTabs.activeTabId) injectDiff(state.activeProjectId, currentTabs.activeTabId, diffLines); setIsRightPanelOpen(true); }} isConsoleOpen={isConsoleOpen} logs={logs} onClearConsole={() => setLogs([])} onCloseConsole={() => setIsConsoleOpen(false)} />
-            ) : <EmptyState text="暂无活跃会话" sub="点击左侧 + 按钮创建新会话" />}
-            <AgentSidebar agents={activeAgents} isOpen={isRightPanelOpen} width={editorWidth} onResizeStart={handleResizeStart('editor')}>
-              <CodeEditor tabs={currentTabs.tabs} activeTab={activeTab} activeTabId={currentTabs.activeTabId} onSwitch={(id) => state.activeProjectId && setActiveTabId(state.activeProjectId, id)} onClose={(id) => state.activeProjectId && closeTab(state.activeProjectId, id)} onChange={(id, content) => state.activeProjectId && updateTabContent(state.activeProjectId, id, content)} onSave={handleSaveFile} onPinTab={(tabId) => state.activeProjectId && pinTab(state.activeProjectId, tabId)} onAcceptDiff={(tabId) => state.activeProjectId && applyDiff(state.activeProjectId, tabId)} onRejectDiff={(tabId) => state.activeProjectId && rejectDiff(state.activeProjectId, tabId)} />
-            </AgentSidebar>
-          </div>
-        </div>
-      ) : <EmptyState text="未检测到活跃项目" sub="点击左上角 📂 图标开启你的 AI 协同工作区" />}
-      <CreateSessionModal isOpen={isSessionModalOpen} onClose={() => setIsSessionModalOpen(false)} onConfirm={handleConfirmSession} availableAgents={agents} singleSelect={isSingleChat} />
-      <CreateGroupModal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} availableAgents={agents} onCreate={handleCreateGroup} />
+        <ConsolePanel isOpen={isConsoleOpen} logs={logs} onClear={() => setLogs([])} onToggle={() => setIsConsoleOpen((p) => !p)} />
+      </div>
+      <CreateSessionModal isOpen={isSessionModalOpen} onClose={() => setIsSessionModalOpen(false)} onConfirm={handleConfirmSession} availableAgents={allAgents} singleSelect={isSingleChat} />
+      <CreateGroupModal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} availableAgents={allAgents} onCreate={handleCreateGroup} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} agents={allAgents} onAddAgent={(agent) => setAllAgents((prev) => [...prev, agent])} />
     </div>
   );
 }

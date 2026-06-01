@@ -9,7 +9,6 @@ import { ArtifactPanel } from './ArtifactPanel';
 import { ArtifactPreview } from './ArtifactPreview';
 import { InlineDiffCard } from './InlineDiffCard';
 import { DeployStatusCard } from './DeployStatusCard';
-import { ConsolePanel, type LogItem } from './ConsolePanel';
 
 interface StreamMessage extends Omit<Message, 'contentType'> {
   isStreaming?: boolean;
@@ -28,10 +27,6 @@ interface ChatAreaProps {
   onToggleRightPanel: () => void;
   onSend: (text: string) => void;
   onApplyDiff: (diffLines: DiffLine[]) => void;
-  isConsoleOpen: boolean;
-  logs: LogItem[];
-  onClearConsole: () => void;
-  onCloseConsole: () => void;
 }
 
 function parseHtmlBlock(content: string): string | null {
@@ -100,7 +95,7 @@ function MessageBubble({ msg, agents, activeTabId, onApplyDiff }: { msg: StreamM
   );
 }
 
-export function ChatArea({ session, messages, agents, isRightPanelOpen, activeTabId, contextItems, onContextItemsChange, onToggleRightPanel, onSend, onApplyDiff, isConsoleOpen, logs, onClearConsole, onCloseConsole }: ChatAreaProps) {
+export function ChatArea({ session, messages, agents, isRightPanelOpen, activeTabId, contextItems, onContextItemsChange, onToggleRightPanel, onSend, onApplyDiff }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [activeCode, setActiveCode] = useState<CodeBlock | null>(null);
 
@@ -128,7 +123,6 @@ export function ChatArea({ session, messages, agents, isRightPanelOpen, activeTa
         </div>
         <ArtifactPanel codeBlock={activeCode} onClose={() => setActiveCode(null)} />
       </div>
-      <ConsolePanel isOpen={isConsoleOpen} logs={logs} onClear={onClearConsole} onClose={onCloseConsole} />
     </main>
   );
 }
