@@ -271,6 +271,98 @@
         }
       },
       "additionalProperties": false
+    },
+    "s2c_action_status": {
+      "type": "object",
+      "required": ["type", "timestamp", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "actionStatus",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server push timestamp in ISO 8601"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "messageId", "actionType", "status"],
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Session context"
+            },
+            "messageId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Target message ID"
+            },
+            "actionType": {
+              "type": "string",
+              "enum": ["applyDiff", "retry", "pin"],
+              "description": "Action being executed"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["applying", "pending"],
+              "description": "Current action execution status"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "s2c_action_result": {
+      "type": "object",
+      "required": ["type", "timestamp", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "actionResult",
+          "description": "Message type discriminator"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server push timestamp in ISO 8601"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "messageId", "actionType", "status", "detail"],
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Session context"
+            },
+            "messageId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Target message ID"
+            },
+            "actionType": {
+              "type": "string",
+              "enum": ["applyDiff", "retry", "pin"],
+              "description": "Action that was executed"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["applied", "rejected", "failed"],
+              "description": "Final action result status"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Human-readable result detail"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "oneOf": [
@@ -281,6 +373,8 @@
     {"$ref": "#/$definitions/s2c_agent_status"},
     {"$ref": "#/$definitions/s2c_message_chunk"},
     {"$ref": "#/$definitions/s2c_message_complete"},
-    {"$ref": "#/$definitions/s2c_error"}
+    {"$ref": "#/$definitions/s2c_error"},
+    {"$ref": "#/$definitions/s2c_action_status"},
+    {"$ref": "#/$definitions/s2c_action_result"}
   ]
 }

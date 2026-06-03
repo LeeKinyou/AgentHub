@@ -29,6 +29,25 @@ logger = logging.getLogger(__name__)
 
 MAX_TOOL_ROUNDS: int = 10
 
+# ---------------------------------------------------------------------------
+# Command whitelist — only these executables may be used as MCP server commands
+# ---------------------------------------------------------------------------
+
+ALLOWED_MCP_COMMANDS: set[str] = {
+    "npx", "node", "python", "python3", "uvx", "uv",
+}
+
+
+def validate_command(command: str) -> None:
+    """Raise ValueError if the command is not in the whitelist."""
+    if not command:
+        raise ValueError("MCP command cannot be empty")
+    if command not in ALLOWED_MCP_COMMANDS:
+        raise ValueError(
+            f"MCP command '{command}' is not allowed. "
+            f"Allowed: {', '.join(sorted(ALLOWED_MCP_COMMANDS))}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Tool descriptor
@@ -116,6 +135,8 @@ class MCPServerConnection:
 
         Returns the list of tools the server exposes.
         """
+        validate_command(self._command)
+
         server_params = StdioServerParameters(
             command=self._command,
             args=self._args,

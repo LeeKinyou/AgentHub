@@ -5,7 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import get_settings
 from .core.database import engine, Base
-from .routes import agents, messages, sessions, users, websocket
+from .core.redis import close_redis
+from .models import SessionAgent  # noqa: F401 — ensure create_all sees it
+from .routes import agents, auth, messages, sessions, users, websocket
 
 settings = get_settings()
 
@@ -17,6 +19,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     yield
     # Shutdown
+    await close_redis()
     await engine.dispose()
 
 
@@ -33,6 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sessions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(agents.router, prefix=settings.API_V1_PREFIX)

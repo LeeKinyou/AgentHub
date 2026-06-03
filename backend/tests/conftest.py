@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base, get_db
+from app.core.redis import reset_redis
 from app.main import app
 
 # 测试数据库配置 — 从环境变量读取，不再硬编码
@@ -71,6 +72,8 @@ async def clear_database():
     async with test_engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
             await conn.execute(text(f"TRUNCATE TABLE {table.name} CASCADE"))
+    # Reset Redis client to avoid stale connections across tests
+    reset_redis()
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:

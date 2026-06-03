@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
+from ..core.auth import hash_password
 from ..core.database import get_db
 from ..models.user import User
 from ..schemas.common import ApiResponse
@@ -28,7 +29,12 @@ async def list_users(
 
 @router.post("", response_model=ApiResponse[UserRead])
 async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
-    user = User(username=body.username, email=body.email, avatar=body.avatar)
+    user = User(
+        username=body.username,
+        email=body.email,
+        password_hash=hash_password(body.password),
+        avatar=body.avatar,
+    )
     db.add(user)
     try:
         await db.flush()

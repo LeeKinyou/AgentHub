@@ -1,12 +1,20 @@
-from pydantic import BaseModel
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .enums import SessionType
+
+
+def _to_camel(s: str) -> str:
+    parts = s.split("_")
+    return parts[0] + "".join(p.capitalize() for p in parts[1:])
 
 
 class SessionCreate(BaseModel):
-    title: str = "新对话"
-    type: str  # single | group
-    agent_ids: list[UUID]
+    title: str = Field("新对话", max_length=255)
+    type: SessionType = SessionType.SINGLE
+    agent_ids: list[UUID] = Field(..., min_length=1)
 
 
 class SessionUpdate(BaseModel):
@@ -14,6 +22,8 @@ class SessionUpdate(BaseModel):
 
 
 class SessionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, alias_generator=_to_camel, populate_by_name=True)
+
     id: UUID
     user_id: UUID
     title: str
@@ -21,5 +31,3 @@ class SessionRead(BaseModel):
     agent_ids: list[UUID]
     created_at: datetime
     updated_at: datetime
-
-    model_config = {"from_attributes": True}

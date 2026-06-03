@@ -8,6 +8,7 @@ async def test_create_user(client: AsyncClient):
     response = await client.post("/api/users", json={
         "username": "testuser",
         "email": "test@example.com",
+        "password": "testpass123",
         "avatar": "https://example.com/avatar.png"
     })
     assert response.status_code == 200
@@ -25,13 +26,14 @@ async def test_create_user(client: AsyncClient):
 async def test_create_user_minimal(client: AsyncClient):
     """Test creating a user with only required fields."""
     response = await client.post("/api/users", json={
-        "username": "minimaluser"
+        "username": "minimaluser",
+        "email": "minimal@example.com",
+        "password": "testpass123",
     })
     assert response.status_code == 200
     data = response.json()
     assert data["code"] == 0
     assert data["data"]["username"] == "minimaluser"
-    assert data["data"]["email"] is None
     assert data["data"]["avatar"] is None
 
 
@@ -48,9 +50,12 @@ async def test_list_users_empty(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_list_users_with_data(client: AsyncClient):
     """Test listing users after creating some."""
-    # Create two users
-    await client.post("/api/users", json={"username": "listuser1"})
-    await client.post("/api/users", json={"username": "listuser2"})
+    await client.post("/api/users", json={
+        "username": "listuser1", "email": "l1@example.com", "password": "pass123456"
+    })
+    await client.post("/api/users", json={
+        "username": "listuser2", "email": "l2@example.com", "password": "pass123456"
+    })
 
     response = await client.get("/api/users")
     assert response.status_code == 200
@@ -62,8 +67,9 @@ async def test_list_users_with_data(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_user(client: AsyncClient):
     """Test getting a specific user by ID."""
-    # Create a user first
-    create_response = await client.post("/api/users", json={"username": "getuser"})
+    create_response = await client.post("/api/users", json={
+        "username": "getuser", "email": "get@example.com", "password": "pass123456"
+    })
     user_id = create_response.json()["data"]["id"]
 
     response = await client.get(f"/api/users/{user_id}")
@@ -87,11 +93,11 @@ async def test_get_user_not_found(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_user(client: AsyncClient):
     """Test updating user information."""
-    # Create a user first
-    create_response = await client.post("/api/users", json={"username": "updateuser"})
+    create_response = await client.post("/api/users", json={
+        "username": "updateuser", "email": "upd@example.com", "password": "pass123456"
+    })
     user_id = create_response.json()["data"]["id"]
 
-    # Update username and email
     response = await client.patch(f"/api/users/{user_id}", json={
         "username": "updateduser",
         "email": "updated@example.com"
@@ -106,14 +112,11 @@ async def test_update_user(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_user_partial(client: AsyncClient):
     """Test partial update of user (only some fields)."""
-    # Create a user first
     create_response = await client.post("/api/users", json={
-        "username": "partialuser",
-        "email": "partial@example.com"
+        "username": "partialuser", "email": "partial@example.com", "password": "pass123456"
     })
     user_id = create_response.json()["data"]["id"]
 
-    # Update only avatar
     response = await client.patch(f"/api/users/{user_id}", json={
         "avatar": "https://example.com/newavatar.png"
     })
@@ -139,11 +142,11 @@ async def test_update_user_not_found(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_delete_user(client: AsyncClient):
     """Test deleting a user."""
-    # Create a user first
-    create_response = await client.post("/api/users", json={"username": "deleteuser"})
+    create_response = await client.post("/api/users", json={
+        "username": "deleteuser", "email": "del@example.com", "password": "pass123456"
+    })
     user_id = create_response.json()["data"]["id"]
 
-    # Delete the user
     response = await client.delete(f"/api/users/{user_id}")
     assert response.status_code == 200
     data = response.json()
@@ -169,16 +172,24 @@ async def test_delete_user_not_found(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_create_duplicate_username(client: AsyncClient):
     """Test creating a user with duplicate username should fail."""
-    await client.post("/api/users", json={"username": "duplicate_user"})
-    response = await client.post("/api/users", json={"username": "duplicate_user"})
-    # Should return 500 due to unique constraint violation
-    assert response.status_code == 500
+    await client.post("/api/users", json={
+        "username": "duplicate_user", "email": "dup1@example.com", "password": "pass123456"
+    })
+    response = await client.post("/api/users", json={
+        "username": "duplicate_user", "email": "dup2@example.com", "password": "pass123456"
+    })
+    assert response.status_code == 200
+    assert response.json()["code"] == 409
 
 
 @pytest.mark.asyncio
 async def test_create_duplicate_email(client: AsyncClient):
     """Test creating a user with duplicate email should fail."""
-    await client.post("/api/users", json={"username": "emailuser1", "email": "same@example.com"})
-    response = await client.post("/api/users", json={"username": "emailuser2", "email": "same@example.com"})
-    # Should return 500 due to unique constraint violation
-    assert response.status_code == 500
+    await client.post("/api/users", json={
+        "username": "emailuser1", "email": "same@example.com", "password": "pass123456"
+    })
+    response = await client.post("/api/users", json={
+        "username": "emailuser2", "email": "same@example.com", "password": "pass123456"
+    })
+    assert response.status_code == 200
+    assert response.json()["code"] == 409

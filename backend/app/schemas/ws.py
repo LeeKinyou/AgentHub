@@ -40,6 +40,7 @@ class WSSendMessage(BaseModel):
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
     type: str = "sendMessage"
+    timestamp: str
     payload: SendMessagePayload
 
 
@@ -47,6 +48,7 @@ class WSTriggerAction(BaseModel):
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
     type: str = "triggerAction"
+    timestamp: str
     payload: TriggerActionPayload
 
 
