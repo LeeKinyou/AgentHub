@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_serializer
 from uuid import UUID
 
 
@@ -45,3 +45,12 @@ class AgentProfileRead(AgentProfileBase):
     status: str = "offline"
 
     model_config = {"from_attributes": True}
+
+    @model_serializer(mode="wrap")
+    def _mask_api_key(self, handler) -> dict:
+        data = handler(self)
+        cfg = data.get("agent_config")
+        if isinstance(cfg, dict) and "api_key" in cfg and cfg["api_key"]:
+            key = cfg["api_key"]
+            cfg["api_key"] = f"****{key[-4:]}" if len(key) > 4 else "****"
+        return data

@@ -2,14 +2,18 @@ import logging
 from pathlib import Path
 
 import aiofiles
+from fastapi import HTTPException
 
 from .config import get_settings
 
 logger = logging.getLogger(__name__)
 
 
-class DiffConflictError(Exception):
+class DiffConflictError(HTTPException):
     """Raised when a hunk's expected old content does not match the actual file content."""
+
+    def __init__(self, detail: str):
+        super().__init__(status_code=409, detail=detail)
 
 
 def _resolve_safe_path(file_path: str, workspace_root: str) -> Path | None:
