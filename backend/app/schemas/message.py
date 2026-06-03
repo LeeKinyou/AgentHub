@@ -1,6 +1,8 @@
-from pydantic import BaseModel, ConfigDict
-from uuid import UUID
 from datetime import datetime
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 def _to_camel(s: str) -> str:
@@ -11,10 +13,10 @@ def _to_camel(s: str) -> str:
 class DiffHunk(BaseModel):
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
-    old_start: int
-    old_lines: int
-    new_start: int
-    new_lines: int
+    old_start: int = Field(ge=1)
+    old_lines: int = Field(ge=0)
+    new_start: int = Field(ge=1)
+    new_lines: int = Field(ge=0)
     content: str
     old_content: str | None = None  # Expected old content for verification
 
@@ -32,10 +34,10 @@ class DiffBlock(BaseModel):
 
     filename: str
     language: str
-    additions: int
-    deletions: int
+    additions: int = Field(ge=0)
+    deletions: int = Field(ge=0)
     hunks: list[DiffHunk]
-    status: str = "pending"  # pending | applied | rejected
+    status: Literal["pending", "applied", "rejected"] = "pending"
 
 
 class PreviewBlock(BaseModel):
@@ -44,22 +46,22 @@ class PreviewBlock(BaseModel):
     html: str
     css: str | None = None
     js: str | None = None
-    viewport: str = "desktop"  # mobile | tablet | desktop
+    viewport: Literal["mobile", "tablet", "desktop"] = "desktop"
 
 
 class DeployLogEntry(BaseModel):
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
     timestamp: str
-    level: str  # info | warn | error
+    level: Literal["info", "warn", "error"]
     message: str
 
 
 class DeployBlock(BaseModel):
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
-    status: str  # queued | building | deploying | live | failed
-    progress: int = 0
+    status: Literal["queued", "building", "deploying", "live", "failed"]
+    progress: int = Field(default=0, ge=0, le=100)
     preview_url: str | None = None
     logs: list[DeployLogEntry] = []
 

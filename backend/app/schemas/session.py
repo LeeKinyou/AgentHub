@@ -12,7 +12,7 @@ def _to_camel(s: str) -> str:
 
 
 class SessionCreate(BaseModel):
-    title: str = Field("新对话", max_length=200)
+    title: str = Field("新对话", max_length=255)
     type: SessionType = SessionType.SINGLE
     agent_ids: list[UUID] = Field(..., min_length=1)
 

@@ -194,6 +194,7 @@ async def _handle_send_message(
             "senderId": agent_msg.sender_id,
             "content": full_content,
             "contentType": "text",
+            "cardData": agent_msg.card_data,
             "createdAt": agent_msg.created_at.isoformat() if agent_msg.created_at else datetime.now(timezone.utc).isoformat(),
         },
     })
