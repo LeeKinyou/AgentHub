@@ -95,6 +95,8 @@ class MCPServerConnection:
         # Signalled when disconnect() is requested; the background task awaits
         # this to know when to exit the context managers.
         self._disconnect_event: asyncio.Event = asyncio.Event()
+        # Signalled when handshake completes successfully.
+        self._ready_event: asyncio.Event = asyncio.Event()
         self._bg_task: asyncio.Task | None = None
 
     # -- public properties ----------------------------------------------------
@@ -128,16 +130,18 @@ class MCPServerConnection:
         )
 
         self._disconnect_event.clear()
+        self._ready_event.clear()
         self._bg_task = asyncio.create_task(
             self._run_context_manager(server_params),
             name=f"mcp-{self.name}",
         )
 
         # Wait until handshake completes or the task fails (20s timeout).
-        for _ in range(200):
-            if self._connected or self._bg_task.done():
-                break
-            await asyncio.sleep(0.1)
+        done, _ = await asyncio.wait(
+            [asyncio.create_task(self._ready_event.wait())],
+            timeout=20.0,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
 
         if not self._connected:
             if self._bg_task.done() and self._bg_task.exception():
@@ -183,6 +187,7 @@ class MCPServerConnection:
                         ", ".join(t.name for t in self._tools),
                     )
                     self._connected = True
+                    self._ready_event.set()
 
                     # Block until disconnect() signals us to shut down
                     await self._disconnect_event.wait()
@@ -191,6 +196,7 @@ class MCPServerConnection:
             pass
         except Exception as exc:
             logger.error("MCP server '%s' connection error: %s", self.name, exc)
+            self._ready_event.set()  # 唤醒 connect() 避免死等
         finally:
             self._connected = False
             self._session = None

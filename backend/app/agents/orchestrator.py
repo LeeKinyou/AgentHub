@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
@@ -69,6 +70,35 @@ class AgentDescriptor:
 class PlanStep:
     agent_id: str
     task: str
+    depends_on: list[int] = field(default_factory=list)
+
+
+def group_steps_into_levels(steps: list[PlanStep]) -> list[list[int]]:
+    """Group steps into execution levels based on dependencies.
+
+    Steps in the same level have no dependencies on each other
+    and can run in parallel.
+
+    Returns list of levels, each level is a list of step indices.
+    """
+    levels: list[list[int]] = []
+    completed: set[int] = set()
+    remaining = set(range(len(steps)))
+
+    while remaining:
+        ready = sorted(
+            idx for idx in remaining
+            if all(dep in completed for dep in steps[idx].depends_on)
+        )
+        if not ready:
+            # Circular dependency — break by taking first remaining
+            ready = [min(remaining)]
+
+        levels.append(ready)
+        completed.update(ready)
+        remaining -= set(ready)
+
+    return levels
 
 
 # ---------------------------------------------------------------------------
@@ -366,89 +396,89 @@ class Orchestrator:
         session_id: str,
         conversation_history: list[Message] | None = None,
     ) -> AsyncGenerator[OrchestratorEvent, None]:
-        """Execute plan steps sequentially, piping context between them.
+        """Execute plan steps with parallel execution for independent steps.
 
-        Each step:
-        1. Broadcasts an 'analyzing' status with the step task.
-        2. Builds context from all prior step outputs.
-        3. Streams the expert's response, relaying chunks to the client.
-        4. Accumulates output for downstream steps.
-        5. On failure, records the error as output and continues.
+        Steps are grouped into levels based on dependencies. Steps in the
+        same level have no dependencies on each other and run in parallel.
         """
         roster_map = {a.agent_id: a for a in agent_roster}
-        accumulated_outputs: list[str] = []
-        accumulated_names: list[str] = []
+        accumulated_outputs: list[str] = [""] * len(steps)
+        accumulated_names: list[str] = [""] * len(steps)
 
-        for step_idx, step in enumerate(steps):
-            agent = roster_map.get(step.agent_id)
-            if agent is None:
-                logger.warning("Step %d targets unknown agent %r", step_idx, step.agent_id)
-                continue
+        levels = group_steps_into_levels(steps)
 
-            yield AgentStatusEvent(
-                agent_id=agent.agent_id,
-                status="analyzing",
-                display_text=f"{agent.name} is analysing step {step_idx + 1}/{len(steps)}…",
-            )
+        for level in levels:
+            # Execute all steps in this level concurrently
+            async def _run_step(step_idx: int) -> tuple[int, list[OrchestratorEvent], str, str]:
+                step = steps[step_idx]
+                agent = roster_map.get(step.agent_id)
+                events: list[OrchestratorEvent] = []
 
-            # Build context-aware task prompt
-            task_prompt = self._build_step_prompt(
-                step.task,
-                step_idx,
-                steps,
-                accumulated_outputs,
-                accumulated_names,
-            )
+                if agent is None:
+                    logger.warning("Step %d targets unknown agent %r", step_idx, step.agent_id)
+                    return step_idx, events, "", ""
 
-            yield AgentStatusEvent(
-                agent_id=agent.agent_id,
-                status="executing",
-                display_text=f"{agent.name} is working on step {step_idx + 1}…",
-            )
+                events.append(AgentStatusEvent(
+                    agent_id=agent.agent_id,
+                    status="analyzing",
+                    display_text=f"{agent.name} is analysing step {step_idx + 1}/{len(steps)}…",
+                ))
 
-            step_output = ""
-            adapter = self._get_adapter(agent)
-            messages: list[Message] = []
-            if conversation_history:
-                messages.extend(conversation_history)
-            messages.append(Message(role="user", content=task_prompt))
+                task_prompt = self._build_step_prompt(
+                    step.task, step_idx, steps,
+                    accumulated_outputs, accumulated_names,
+                )
 
-            try:
-                async for chunk in adapter.stream_chat(messages):
-                    step_output += chunk.content
-                    yield MessageChunk(
-                        chunk_type=chunk.chunk_type,
-                        content=chunk.content,
-                        is_final=chunk.is_final,
+                events.append(AgentStatusEvent(
+                    agent_id=agent.agent_id,
+                    status="executing",
+                    display_text=f"{agent.name} is working on step {step_idx + 1}…",
+                ))
+
+                step_output = ""
+                adapter = self._get_adapter(agent)
+                messages: list[Message] = []
+                if conversation_history:
+                    messages.extend(conversation_history)
+                messages.append(Message(role="user", content=task_prompt))
+
+                try:
+                    async for chunk in adapter.stream_chat(messages):
+                        step_output += chunk.content
+                        events.append(MessageChunk(
+                            chunk_type=chunk.chunk_type,
+                            content=chunk.content,
+                            is_final=chunk.is_final,
+                            agent_id=agent.agent_id,
+                        ))
+                    events.append(AgentStatusEvent(
                         agent_id=agent.agent_id,
-                    )
-                yield AgentStatusEvent(
-                    agent_id=agent.agent_id,
-                    status="completed",
-                    display_text=f"{agent.name} completed step {step_idx + 1}.",
-                )
-            except Exception as exc:
-                logger.exception(
-                    "Agent %s failed on step %d: %s",
-                    agent.agent_id,
-                    step_idx,
-                    exc,
-                )
-                yield AgentStatusEvent(
-                    agent_id=agent.agent_id,
-                    status="failed",
-                    display_text=f"{agent.name} encountered an error on step {step_idx + 1}.",
-                )
-                step_output = f"[Error from {agent.name}: {exc}]"
-                yield MessageChunk(
-                    chunk_type="text",
-                    content=step_output,
-                    is_final=True,
-                    agent_id=agent.agent_id,
-                )
+                        status="completed",
+                        display_text=f"{agent.name} completed step {step_idx + 1}.",
+                    ))
+                except Exception as exc:
+                    logger.exception("Agent %s failed on step %d: %s", agent.agent_id, step_idx, exc)
+                    events.append(AgentStatusEvent(
+                        agent_id=agent.agent_id,
+                        status="failed",
+                        display_text=f"{agent.name} encountered an error on step {step_idx + 1}.",
+                    ))
+                    step_output = f"[Error from {agent.name}: {exc}]"
+                    events.append(MessageChunk(
+                        chunk_type="text", content=step_output,
+                        is_final=True, agent_id=agent.agent_id,
+                    ))
 
-            accumulated_outputs.append(step_output)
-            accumulated_names.append(agent.name)
+                return step_idx, events, step_output, agent.name
+
+            results = await asyncio.gather(*[_run_step(idx) for idx in level])
+
+            # Yield events and accumulate outputs in step order
+            for step_idx, events, step_output, agent_name in sorted(results, key=lambda r: r[0]):
+                for event in events:
+                    yield event
+                accumulated_outputs[step_idx] = step_output
+                accumulated_names[step_idx] = agent_name
 
     @staticmethod
     def _build_step_prompt(
