@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -24,9 +24,15 @@ async def list_messages(
     if cursor:
         cursor_msg = await db.get(Message, cursor)
         if cursor_msg:
-            stmt = stmt.where(Message.created_at < cursor_msg.created_at)
+            # 使用 (created_at, id) 复合游标，避免相同时间戳导致分页丢失/重复
+            stmt = stmt.where(
+                or_(
+                    Message.created_at < cursor_msg.created_at,
+                    (Message.created_at == cursor_msg.created_at) & (Message.id < cursor_msg.id),
+                )
+            )
 
-    stmt = stmt.order_by(Message.created_at.desc()).limit(limit)
+    stmt = stmt.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit)
     result = await db.execute(stmt)
     messages = result.scalars().all()
     return ApiResponse(data=[MessageRead.model_validate(m) for m in messages])

@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from ..core.database import get_db
 from ..models.user import User
@@ -13,8 +14,14 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("", response_model=ApiResponse[list[UserRead]])
-async def list_users(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).order_by(User.created_at.desc()))
+async def list_users(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(User).order_by(User.created_at.desc()).offset(offset).limit(limit)
+    )
     users = result.scalars().all()
     return ApiResponse(data=[UserRead.model_validate(u) for u in users])
 
@@ -23,7 +30,11 @@ async def list_users(db: AsyncSession = Depends(get_db)):
 async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
     user = User(username=body.username, email=body.email, avatar=body.avatar)
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        return ApiResponse(code=409, message="Username or email already exists")
     await db.refresh(user)
     return ApiResponse(data=UserRead.model_validate(user))
 

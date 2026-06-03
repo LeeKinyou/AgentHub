@@ -36,11 +36,11 @@ class GlobalExceptionHandler:
 
     @staticmethod
     def _classify_error(exception: Exception) -> str:
-        mapping = {
-            TimeoutError: "TIMEOUT",
-            ConnectionError: "CONNECTION_ERROR",
-        }
-        return mapping.get(type(exception), "UNKNOWN_ERROR")
+        if isinstance(exception, TimeoutError):
+            return "TIMEOUT"
+        if isinstance(exception, ConnectionError):
+            return "CONNECTION_ERROR"
+        return "UNKNOWN_ERROR"
 
     @staticmethod
     def _is_recoverable(exception: Exception) -> bool:
