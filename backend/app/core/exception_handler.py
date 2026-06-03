@@ -3,6 +3,20 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket
 
+SAFE_ERROR_MESSAGES: dict[str, str] = {
+    "TIMEOUT": "请求超时，请稍后重试",
+    "CONNECTION_ERROR": "网络连接异常，请检查网络",
+    "AUTH_ERROR": "认证失败，请重新登录",
+    "PERMISSION_ERROR": "没有权限执行此操作",
+    "VALIDATION_ERROR": "请求参数不合法",
+    "UNKNOWN_ERROR": "服务内部错误，请稍后重试",
+}
+
+
+def safe_error_message(error_code: str, exception: Exception) -> str:
+    """Return a safe error message that does not leak internal details."""
+    return SAFE_ERROR_MESSAGES.get(error_code, SAFE_ERROR_MESSAGES["UNKNOWN_ERROR"])
+
 
 class GlobalExceptionHandler:
     """Global exception handler for WebSocket connections.
@@ -27,7 +41,7 @@ class GlobalExceptionHandler:
             "payload": {
                 "sessionId": session_id,
                 "errorCode": error_code,
-                "errorMessage": str(exception),
+                "errorMessage": safe_error_message(error_code, exception),
                 "recoverable": recoverable,
             },
         }
