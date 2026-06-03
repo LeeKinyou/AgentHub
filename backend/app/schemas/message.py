@@ -1,24 +1,35 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 from datetime import datetime
 
 
+def _to_camel(s: str) -> str:
+    parts = s.split("_")
+    return parts[0] + "".join(p.capitalize() for p in parts[1:])
+
+
 class DiffHunk(BaseModel):
-    oldStart: int
-    oldLines: int
-    newStart: int
-    newLines: int
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    old_start: int
+    old_lines: int
+    new_start: int
+    new_lines: int
     content: str
-    oldContent: str | None = None  # Expected old content for verification
+    old_content: str | None = None  # Expected old content for verification
 
 
 class CodeBlock(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     language: str
     code: str
     title: str
 
 
 class DiffBlock(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     filename: str
     language: str
     additions: int
@@ -28,6 +39,8 @@ class DiffBlock(BaseModel):
 
 
 class PreviewBlock(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     html: str
     css: str | None = None
     js: str | None = None
@@ -35,26 +48,34 @@ class PreviewBlock(BaseModel):
 
 
 class DeployLogEntry(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     timestamp: str
     level: str  # info | warn | error
     message: str
 
 
 class DeployBlock(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     status: str  # queued | building | deploying | live | failed
     progress: int = 0
-    previewUrl: str | None = None
+    preview_url: str | None = None
     logs: list[DeployLogEntry] = []
 
 
 class CardData(BaseModel):
-    codeBlock: CodeBlock | None = None
-    diffBlock: DiffBlock | None = None
-    previewBlock: PreviewBlock | None = None
-    deployBlock: DeployBlock | None = None
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    code_block: CodeBlock | None = None
+    diff_block: DiffBlock | None = None
+    preview_block: PreviewBlock | None = None
+    deploy_block: DeployBlock | None = None
 
 
 class MessageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, alias_generator=_to_camel, populate_by_name=True)
+
     id: UUID
     session_id: UUID
     sender_type: str
@@ -63,8 +84,6 @@ class MessageRead(BaseModel):
     content_type: str
     card_data: dict | None = None
     created_at: datetime
-
-    model_config = {"from_attributes": True}
 
 
 class MessageCreate(BaseModel):

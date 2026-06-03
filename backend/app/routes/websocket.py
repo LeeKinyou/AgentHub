@@ -153,16 +153,17 @@ async def _handle_send_message(
                 })
             elif isinstance(event, MessageChunk):
                 full_content += event.content
+                chunk_index = getattr(event, "chunk_index", 0)
                 await websocket.send_json({
                     "type": "messageChunk",
-                    "timestamp": "",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "payload": {
                         "messageId": response_message_id,
                         "sessionId": session_id,
                         "agentId": event.agent_id or primary_agent_id,
                         "chunkType": event.chunk_type,
                         "deltaContent": event.content,
-                        "chunkIndex": 0,
+                        "chunkIndex": chunk_index,
                         "isFinal": event.is_final,
                     },
                 })
@@ -181,19 +182,19 @@ async def _handle_send_message(
         .values(updated_at=datetime.now(timezone.utc))
     )
     await db.commit()
+    await db.refresh(agent_msg)
 
     await websocket.send_json({
         "type": "messageComplete",
-        "timestamp": "",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "payload": {
             "id": str(agent_msg.id),
-            "messageId": response_message_id,
             "sessionId": session_id,
             "senderType": "agent",
             "senderId": agent_msg.sender_id,
             "content": full_content,
             "contentType": "text",
-            "createdAt": "",
+            "createdAt": agent_msg.created_at.isoformat() if agent_msg.created_at else datetime.now(timezone.utc).isoformat(),
         },
     })
 
@@ -283,7 +284,31 @@ async def _handle_trigger_action(
 async def websocket_endpoint(
     websocket: WebSocket,
     session_id: str,
+    token: str | None = None,
 ):
+    # Authenticate before accepting
+    if not token:
+        await websocket.close(code=4003, reason="Token required")
+        return
+
+    from ..core.auth import decode_access_token
+    from ..core.redis import get_redis_client
+    try:
+        payload = decode_access_token(token)
+    except Exception:
+        await websocket.close(code=4003, reason="Invalid or expired token")
+        return
+
+    # Check blacklist
+    jti = payload.get("jti")
+    if jti:
+        redis = await get_redis_client()
+        if await redis.exists(f"bl:{jti}"):
+            await websocket.close(code=4003, reason="Token has been revoked")
+            return
+
+    user_id_str = payload.get("sub")
+
     await websocket.accept()
 
     async with async_session() as db:
@@ -302,6 +327,11 @@ async def websocket_endpoint(
                 websocket, session_id, ValueError("Session not found")
             )
             await websocket.close()
+            return
+
+        # Verify session ownership
+        if user_id_str and str(session.user_id) != user_id_str:
+            await websocket.close(code=4003, reason="Session does not belong to this user")
             return
 
         orchestrator = Orchestrator()
