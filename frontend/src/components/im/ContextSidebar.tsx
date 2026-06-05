@@ -12,9 +12,11 @@ interface ContextSidebarProps {
   onPlusClick: () => void;
   onOpenGroupModal: () => void;
   onDeleteSession: (sessionId: string) => void;
+  onPinSession?: (sessionId: string) => void;
+  onArchiveSession?: (sessionId: string) => void;
 }
 
-export function ContextSidebar({ project, activeSessionId, width, onResizeStart, onSelectSession, onPlusClick, onOpenGroupModal, onDeleteSession }: ContextSidebarProps) {
+export function ContextSidebar({ project, activeSessionId, width, onResizeStart, onSelectSession, onPlusClick, onOpenGroupModal, onDeleteSession, onPinSession, onArchiveSession }: ContextSidebarProps) {
   return (
     <aside className="relative h-screen bg-zinc-50 dark:bg-zinc-900/30 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shrink-0" style={{ width }}>
       <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
@@ -29,6 +31,8 @@ export function ContextSidebar({ project, activeSessionId, width, onResizeStart,
             onPlusClick={onPlusClick}
             onOpenGroupModal={onOpenGroupModal}
             onDelete={onDeleteSession}
+            onPin={onPinSession}
+            onArchive={onArchiveSession}
           />
         </div>
       </div>

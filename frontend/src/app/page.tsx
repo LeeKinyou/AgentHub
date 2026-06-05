@@ -51,6 +51,7 @@ export default function Home() {
   const [contextItems, setContextItems] = useState<ContextItem[]>([]);
   const [contextWidth, setContextWidth] = useState(260);
   const [editorWidth, setEditorWidth] = useState(320);
+  const [replyToId, setReplyToId] = useState<string | null>(null);
   const streamTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { activeProjectTabs, openTab, closeTab, setActiveTabId, updateTabContent, pinTab, setTabClean, injectDiff, applyDiff, rejectDiff } = useEditorTabs();
 
@@ -156,6 +157,40 @@ export default function Home() {
     setIsSessionModalOpen(false);
   }, [state.handleCreateSession]);
 
+  const handlePinSession = useCallback((sessionId: string) => {
+    state.handleTogglePinSession(sessionId);
+  }, [state.handleTogglePinSession]);
+
+  const handleArchiveSession = useCallback((sessionId: string) => {
+    state.handleToggleArchiveSession(sessionId);
+  }, [state.handleToggleArchiveSession]);
+
+  const handleReply = useCallback((messageId: string) => {
+    setReplyToId(messageId);
+  }, []);
+
+  const handleQuote = useCallback((messageId: string) => {
+    const msg = allMessages.find((m) => m.id === messageId);
+    if (msg) {
+      const quoteText = `> ${msg.content.split('\n').slice(0, 3).join('\n> ')}\n\n`;
+      setContextItems((prev) => [...prev, { id: `quote-${crypto.randomUUID()}`, type: 'snippet', name: quoteText }]);
+    }
+  }, [allMessages]);
+
+  const handleRegenerate = useCallback((messageId: string) => {
+    addLog('info', 'Chat', `Regenerating message ${messageId}`);
+  }, [addLog]);
+
+  const handlePinMessage = useCallback((messageId: string) => {
+    setAllMessages((prev) => prev.map((m) => 
+      m.id === messageId ? { ...m, isPinned: !m.isPinned } : m
+    ));
+  }, []);
+
+  const handleClearReply = useCallback(() => {
+    setReplyToId(null);
+  }, []);
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200">
       <ProjectDock projects={state.projects} activeProjectId={state.activeProjectId} theme={theme} onSelectProject={handleSelectProjectAndExpand} onOpenProject={state.handleOpenProject} onNewProject={state.handleNewProject} onDeleteProject={state.handleDeleteProject} onThemeChange={setTheme} onOpenSettings={() => setIsSettingsOpen(true)} />
@@ -169,9 +204,9 @@ export default function Home() {
           {state.activeProject && state.activeFileTree ? (
             <div className="flex-1 flex flex-col min-w-0">
               <div className="flex-1 flex min-h-0">
-                <ContextSidebar project={{ ...state.activeProject, fileTree: state.activeFileTree }} activeSessionId={state.activeSessionId} width={contextWidth} onResizeStart={handleResizeStart('context')} onSelectSession={state.setActiveSessionId} onPlusClick={openSingleChat} onOpenGroupModal={() => setIsGroupModalOpen(true)} onDeleteSession={state.handleDeleteSession} />
+                <ContextSidebar project={{ ...state.activeProject, fileTree: state.activeFileTree }} activeSessionId={state.activeSessionId} width={contextWidth} onResizeStart={handleResizeStart('context')} onSelectSession={state.setActiveSessionId} onPlusClick={openSingleChat} onOpenGroupModal={() => setIsGroupModalOpen(true)} onDeleteSession={state.handleDeleteSession} onPinSession={handlePinSession} onArchiveSession={handleArchiveSession} />
                 {state.activeSession ? (
-                  <ChatArea session={state.activeSession} messages={activeMessages} agents={activeAgents} isRightPanelOpen={isRightPanelOpen} activeTabId={currentTabs.activeTabId} contextItems={contextItems} onContextItemsChange={setContextItems} onToggleRightPanel={() => setIsRightPanelOpen((prev) => !prev)} onSend={handleSend} onApplyDiff={(diffLines) => { if (state.activeProjectId && currentTabs.activeTabId) injectDiff(state.activeProjectId, currentTabs.activeTabId, diffLines); setIsRightPanelOpen(true); }} />
+                  <ChatArea session={state.activeSession} messages={activeMessages} agents={activeAgents} isRightPanelOpen={isRightPanelOpen} activeTabId={currentTabs.activeTabId} contextItems={contextItems} onContextItemsChange={setContextItems} onToggleRightPanel={() => setIsRightPanelOpen((prev) => !prev)} onSend={handleSend} onApplyDiff={(diffLines) => { if (state.activeProjectId && currentTabs.activeTabId) injectDiff(state.activeProjectId, currentTabs.activeTabId, diffLines); setIsRightPanelOpen(true); }} onReply={handleReply} onQuote={handleQuote} onRegenerate={handleRegenerate} onPinMessage={handlePinMessage} replyToId={replyToId} onClearReply={handleClearReply} />
                 ) : <EmptyState text="暂无活跃会话" sub="点击左侧 + 按钮创建新会话" />}
                 <AgentSidebar agents={activeAgents} isOpen={isRightPanelOpen} width={editorWidth} onResizeStart={handleResizeStart('editor')}>
                   <CodeEditor tabs={currentTabs.tabs} activeTab={activeTab} activeTabId={currentTabs.activeTabId} onSwitch={(id) => state.activeProjectId && setActiveTabId(state.activeProjectId, id)} onClose={(id) => state.activeProjectId && closeTab(state.activeProjectId, id)} onChange={(id, content) => state.activeProjectId && updateTabContent(state.activeProjectId, id, content)} onSave={handleSaveFile} onPinTab={(tabId) => state.activeProjectId && pinTab(state.activeProjectId, tabId)} onAcceptDiff={(tabId) => state.activeProjectId && applyDiff(state.activeProjectId, tabId)} onRejectDiff={(tabId) => state.activeProjectId && rejectDiff(state.activeProjectId, tabId)} />
@@ -184,7 +219,7 @@ export default function Home() {
       </div>
       <CreateSessionModal isOpen={isSessionModalOpen} onClose={() => setIsSessionModalOpen(false)} onConfirm={handleConfirmSession} availableAgents={allAgents} singleSelect={isSingleChat} />
       <CreateGroupModal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} availableAgents={allAgents} onCreate={handleCreateGroup} />
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} agents={allAgents} onAddAgent={(agent) => setAllAgents((prev) => [...prev, agent])} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} agents={allAgents} onAddAgent={(agent) => setAllAgents((prev) => [...prev, agent])} onDeleteAgent={(id) => setAllAgents((prev) => prev.filter((a) => a.id !== id))} />
     </div>
   );
 }

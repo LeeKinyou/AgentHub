@@ -105,6 +105,32 @@ export function useProjectState() {
     setActiveSessionId(newSession.id);
   }, [activeProjectId]);
 
+  const handleTogglePinSession = useCallback((sessionId: string) => {
+    if (!activeProjectId) return;
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== activeProjectId) return p;
+      return {
+        ...p,
+        sessions: p.sessions.map((s) => 
+          s.id === sessionId ? { ...s, isPinned: !s.isPinned } : s
+        ),
+      };
+    }));
+  }, [activeProjectId]);
+
+  const handleToggleArchiveSession = useCallback((sessionId: string) => {
+    if (!activeProjectId) return;
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== activeProjectId) return p;
+      return {
+        ...p,
+        sessions: p.sessions.map((s) => 
+          s.id === sessionId ? { ...s, isArchived: !s.isArchived } : s
+        ),
+      };
+    }));
+  }, [activeProjectId]);
+
   const updateFileTree = useCallback((updater: (tree: FileNode) => FileNode) => {
     if (!activeProjectId) return;
     setRealFileTrees((prev) => {
@@ -162,5 +188,6 @@ export function useProjectState() {
     projects, activeProjectId, activeSessionId, activeProject, activeSession, activeFileTree,
     setActiveSessionId, setRealFileTrees, handleSelectProject, handleDeleteProject,
     handleDeleteSession, handleOpenProject, handleNewProject, handleOpenFile, handleCreateSession, handleCreateGroup, handleFileAction,
+    handleTogglePinSession, handleToggleArchiveSession,
   };
 }

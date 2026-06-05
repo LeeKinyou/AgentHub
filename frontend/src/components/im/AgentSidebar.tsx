@@ -19,7 +19,29 @@ function RoleBadge({ role }: { role: 'orchestrator' | 'expert' }) {
   );
 }
 
+function StatusIndicator({ status }: { status?: 'online' | 'offline' | 'busy' | 'error' }) {
+  const colors: Record<string, string> = {
+    online: 'bg-green-500',
+    offline: 'bg-zinc-500',
+    busy: 'bg-amber-500',
+    error: 'bg-red-500',
+  };
+  return (
+    <div className={`w-2 h-2 rounded-full ${colors[status ?? 'offline']} shrink-0`} title={status ?? 'offline'} />
+  );
+}
+
+const CAPABILITY_TAGS: Record<string, { icon: string; label: string; color: string }> = {
+  code_gen: { icon: '💻', label: '代码生成', color: 'bg-indigo-500/20 text-indigo-400' },
+  web_search: { icon: '🌐', label: '联网搜索', color: 'bg-blue-500/20 text-blue-400' },
+  fs_io: { icon: '📁', label: '文件读写', color: 'bg-amber-500/20 text-amber-400' },
+  terminal: { icon: '🐚', label: '终端执行', color: 'bg-green-500/20 text-green-400' },
+  deploy: { icon: '🚀', label: '一键部署', color: 'bg-purple-500/20 text-purple-400' },
+};
+
 function AgentCard({ agent }: { agent: AgentProfile }) {
+  const capabilities = (agent as AgentProfile & { capabilities?: string[] }).capabilities ?? [];
+
   return (
     <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors duration-150">
       <div className="flex items-center gap-2 mb-2">
@@ -27,11 +49,27 @@ function AgentCard({ agent }: { agent: AgentProfile }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-zinc-200 truncate">{agent.name}</span>
+            <StatusIndicator status={agent.status} />
+          </div>
+          <div className="flex items-center gap-1.5 mt-1">
             <RoleBadge role={agent.role} />
           </div>
         </div>
       </div>
-      <p className="text-xs text-zinc-500 line-clamp-2">{agent.description}</p>
+      <p className="text-xs text-zinc-500 line-clamp-2 mb-2">{agent.description}</p>
+      {capabilities.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {capabilities.map((cap) => {
+            const tag = CAPABILITY_TAGS[cap];
+            if (!tag) return null;
+            return (
+              <span key={cap} className={`px-1.5 py-0.5 text-[10px] rounded ${tag.color}`}>
+                {tag.icon} {tag.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -51,7 +89,14 @@ export function AgentSidebar({ agents, isOpen, width, onResizeStart, children }:
         <>
           <div className="p-4 border-b border-zinc-800">
             <h3 className="text-sm font-semibold text-zinc-200">智能体面板</h3>
-            <p className="text-[11px] text-zinc-500 mt-0.5">{agents.length} 个专家就绪</p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-green-500 rounded-full" />
+                <span className="text-[11px] text-zinc-500">{agents.filter((a) => a.status === 'online').length} 在线</span>
+              </div>
+              <span className="text-zinc-700">·</span>
+              <span className="text-[11px] text-zinc-500">{agents.length} 个专家就绪</span>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
             {agents.map((agent) => (

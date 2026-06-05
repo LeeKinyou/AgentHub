@@ -20,6 +20,8 @@ interface InputContextAreaProps {
   onRemoveContext: (id: string) => void;
   onSend: (text: string) => void;
   onDropFile?: (fileName: string) => void;
+  replyToId?: string | null;
+  onClearReply?: () => void;
 }
 
 function ContextChipsBar({ items, onRemove }: { items: ContextItem[]; onRemove: (id: string) => void }) {
@@ -45,7 +47,7 @@ function ContextChipsBar({ items, onRemove }: { items: ContextItem[]; onRemove: 
   );
 }
 
-export function InputContextArea({ agents, contextItems, onRemoveContext, onSend, onDropFile }: InputContextAreaProps) {
+export function InputContextArea({ agents, contextItems, onRemoveContext, onSend, onDropFile, replyToId, onClearReply }: InputContextAreaProps) {
   const [text, setText] = useState('');
   const [mentionKey, setMentionKey] = useState('');
   const [isMentionOpen, setIsMentionOpen] = useState(false);
@@ -119,6 +121,14 @@ export function InputContextArea({ agents, contextItems, onRemoveContext, onSend
       )}
       <MentionList agents={filteredAgents} isOpen={isMentionOpen} highlightIndex={mentionIdx} onSelect={handleSelectMention} />
       <ContextChipsBar items={contextItems} onRemove={onRemoveContext} />
+      {replyToId && (
+        <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+          <span className="text-xs text-indigo-600 dark:text-indigo-400">↩️ 回复消息</span>
+          <button onClick={onClearReply} className="ml-auto text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
       <p className="text-[11px] text-zinc-400 dark:text-zinc-600 mb-2">
         @ 唤醒智能体 · / 快捷指令 · 拖拽文件附加 · Enter 发送
       </p>
