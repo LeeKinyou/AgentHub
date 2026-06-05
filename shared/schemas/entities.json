@@ -82,8 +82,8 @@
       "properties": {
         "oldStart": {
           "type": "integer",
-          "minimum": 1,
-          "description": "Starting line number in the original file"
+          "minimum": 0,
+          "description": "Starting line number in the original file (0 for new file creation)"
         },
         "oldLines": {
           "type": "integer",

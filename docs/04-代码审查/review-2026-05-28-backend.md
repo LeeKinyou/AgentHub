@@ -344,36 +344,36 @@ for _ in range(200):
 
 | # | 优先级 | 类别 | 问题 | 文件 | 状态 | 修复说明 |
 |---|---|---|---|---|---|---|
-| 1 | **P0** | 安全 | 硬编码数据库凭据 | `tests/conftest.py` | ⬜ 待修复 | |
-| 2 | **P0** | 安全 | 无认证授权 | 全局 | ⬜ 待修复 | |
-| 3 | **P0** | 安全 | API Key 泄露 | `schemas/agent.py` | ⬜ 待修复 | |
-| 4 | **P0** | 安全 | triggerAction 缺乏权限校验 | `routes/websocket.py` | ⬜ 待修复 | |
-| 5 | **P0** | 逻辑 | 差分引擎无法验证旧内容 | `core/diff_engine.py` | ⬜ 待修复 | |
-| 6 | **P1** | 逻辑 | messageId 每 chunk 重新生成 | `routes/websocket.py` | ⬜ 待修复 | |
-| 7 | **P1** | 逻辑 | cursor 分页基于非唯一字段 | `routes/messages.py` | ⬜ 待修复 | |
-| 8 | **P1** | 逻辑 | create_user 无唯一性校验 | `routes/users.py` | ⬜ 待修复 | |
-| 9 | **P1** | 逻辑 | 错误分类使用精确类型匹配 | `core/exception_handler.py` | ⬜ 待修复 | |
-| 10 | **P1** | 逻辑 | updated_at 不自动更新 | `models/session.py` | ⬜ 待修复 | |
-| 11 | **P2** | 架构 | Redis 未使用 | 全局 | ⬜ 待修复 | |
+| 1 | **P0** | 安全 | 硬编码数据库凭据 | `tests/conftest.py` | ✅ 已修复 | 改为 `os.environ.get()` |
+| 2 | **P0** | 安全 | 无认证授权 | 全局 | ✅ 已修复 | JWT + Redis 双 token 认证体系 |
+| 3 | **P0** | 安全 | API Key 泄露 | `schemas/agent.py` | ✅ 已修复 | `model_serializer` 脱敏 |
+| 4 | **P0** | 安全 | triggerAction 缺乏权限校验 | `routes/websocket.py` | ✅ 已修复 | 查询条件包含 `session_id` |
+| 5 | **P0** | 逻辑 | 差分引擎无法验证旧内容 | `core/diff_engine.py` | ✅ 已修复 | 新增 `oldContent` 字段 + 校验 |
+| 6 | **P1** | 逻辑 | messageId 每 chunk 重新生成 | `routes/websocket.py` | ✅ 已修复 | 统一 `response_message_id` |
+| 7 | **P1** | 逻辑 | cursor 分页基于非唯一字段 | `routes/messages.py` | ✅ 已修复 | 复合游标 `(created_at, id)` |
+| 8 | **P1** | 逻辑 | create_user 无唯一性校验 | `routes/users.py` | ✅ 已修复 | 捕获 `IntegrityError` → 409 |
+| 9 | **P1** | 逻辑 | 错误分类使用精确类型匹配 | `core/exception_handler.py` | ✅ 已修复 | 改用 `isinstance()` |
+| 10 | **P1** | 逻辑 | updated_at 不自动更新 | `models/session.py` | ⚠️ 部分修复 | WS 手动更新，ORM 层仍不一致 |
+| 11 | **P2** | 架构 | Redis 未使用 | 全局 | ✅ 已修复 | Token 黑名单 + Refresh Token |
 | 12 | **P2** | 架构 | 无数据库迁移工具 | `main.py` | ⬜ 待修复 | |
-| 13 | **P2** | 架构 | 无多轮对话上下文 | `routes/websocket.py` | ⬜ 待修复 | |
-| 14 | **P2** | 架构 | WebSocket 无并发控制 | `routes/websocket.py` | ⬜ 待修复 | |
-| 15 | **P2** | 架构 | 多 Agent 仅顺序执行 | `agents/orchestrator.py` | ⬜ 待修复 | |
-| 16 | **P3** | 质量 | WebSocket 路由过于臃肿 | `routes/websocket.py` | ⬜ 待修复 | |
-| 17 | **P3** | 质量 | list_users 无分页 | `routes/users.py` | ⬜ 待修复 | |
-| 18 | **P3** | 质量 | 缺少数据库索引 | `models/*.py` | ⬜ 待修复 | |
-| 19 | **P3** | 质量 | MCP 连接使用轮询 | `core/mcp_manager.py` | ⬜ 待修复 | |
-| 20 | **P3** | 质量 | WS Schema 未被使用 | `schemas/ws.py` | ⬜ 待修复 | |
+| 13 | **P2** | 架构 | 无多轮对话上下文 | `routes/websocket.py` | ✅ 已修复 | `build_conversation_history` |
+| 14 | **P2** | 架构 | WebSocket 无并发控制 | `routes/websocket.py` | ✅ 已修复 | `WebSocketSessionGuard` |
+| 15 | **P2** | 架构 | 多 Agent 仅顺序执行 | `agents/orchestrator.py` | ✅ 已修复 | `group_steps_into_levels` + `asyncio.gather` |
+| 16 | **P3** | 质量 | WebSocket 路由过于臃肿 | `routes/websocket.py` | ✅ 已修复 | 拆分为独立 handler |
+| 17 | **P3** | 质量 | list_users 无分页 | `routes/users.py` | ✅ 已修复 | `limit`/`offset` 分页 |
+| 18 | **P3** | 质量 | 缺少数据库索引 | `models/*.py` | ✅ 已修复 | `ix_sessions_user_id` 等 |
+| 19 | **P3** | 质量 | MCP 连接使用轮询 | `core/mcp_manager.py` | ✅ 已修复 | 改用 `asyncio.Event` |
+| 20 | **P3** | 质量 | WS Schema 未被使用 | `schemas/ws.py` | ✅ 已修复 | `validate_ws_message()` |
 
 ### 修复进度统计
 
-| 优先级 | 总数 | 已修复 | 待修复 | 不修复 |
+| 优先级 | 总数 | 已修复 | 待修复 | 部分修复 |
 |---|---|---|---|---|
-| P0 (严重) | 5 | 0 | 5 | 0 |
-| P1 (重要) | 5 | 0 | 5 | 0 |
-| P2 (架构) | 5 | 0 | 5 | 0 |
-| P3 (质量) | 5 | 0 | 5 | 0 |
-| **合计** | **20** | **0** | **20** | **0** |
+| P0 (严重) | 5 | 5 | 0 | 0 |
+| P1 (重要) | 5 | 4 | 0 | 1 |
+| P2 (架构) | 5 | 4 | 1 | 0 |
+| P3 (质量) | 5 | 5 | 0 | 0 |
+| **合计** | **20** | **18** | **1** | **1** |
 
 ---
 

@@ -1,12 +1,13 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from ..core.auth import hash_password
 from ..core.database import get_db
+from ..dependencies import get_current_user
 from ..models.user import User
 from ..schemas.common import ApiResponse
 from ..schemas.user import UserCreate, UserRead, UserUpdate
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def list_users(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -46,7 +48,11 @@ async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{user_id}", response_model=ApiResponse[UserRead])
-async def get_user(user_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_user(
+    user_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     user = await db.get(User, user_id)
     if not user:
         return ApiResponse(code=404, message="User not found")
@@ -54,7 +60,14 @@ async def get_user(user_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=ApiResponse[UserRead])
-async def update_user(user_id: UUID, body: UserUpdate, db: AsyncSession = Depends(get_db)):
+async def update_user(
+    user_id: UUID,
+    body: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Cannot modify other users")
     user = await db.get(User, user_id)
     if not user:
         return ApiResponse(code=404, message="User not found")
@@ -64,13 +77,23 @@ async def update_user(user_id: UUID, body: UserUpdate, db: AsyncSession = Depend
         user.email = body.email
     if body.avatar is not None:
         user.avatar = body.avatar
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        return ApiResponse(code=409, message="Username or email already exists")
     await db.refresh(user)
     return ApiResponse(data=UserRead.model_validate(user))
 
 
 @router.delete("/{user_id}", response_model=ApiResponse)
-async def delete_user(user_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_user(
+    user_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Cannot delete other users")
     user = await db.get(User, user_id)
     if not user:
         return ApiResponse(code=404, message="User not found")

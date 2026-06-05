@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,8 +64,9 @@ async def create_agent(
     db: AsyncSession = Depends(get_db),
 ):
     config_dict = body.agent_config.model_dump() if body.agent_config else None
+    # Use current_user.id — ignore body.user_id to prevent creating agents under other users
     agent = AgentProfile(
-        user_id=body.user_id,
+        user_id=current_user.id,
         name=body.name,
         avatar=body.avatar,
         role=body.role,
@@ -90,6 +91,9 @@ async def update_agent(
     agent = await db.get(AgentProfile, agent_id)
     if not agent:
         return ApiResponse(code=404, message="Agent not found")
+    # Ownership check: only the owner can modify (system agents with user_id=None are protected)
+    if agent.user_id and agent.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
     if body.name is not None:
         agent.name = body.name
     if body.avatar is not None:
@@ -116,5 +120,8 @@ async def delete_agent(
     agent = await db.get(AgentProfile, agent_id)
     if not agent:
         return ApiResponse(code=404, message="Agent not found")
+    # Ownership check: only the owner can delete
+    if agent.user_id and agent.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
     await db.delete(agent)
     return ApiResponse(message="deleted")

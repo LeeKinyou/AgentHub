@@ -11,9 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..agents.base_adapter import AgentStatusEvent, Message as AgentMessage, MessageChunk
 from ..agents.orchestrator import AgentDescriptor, Orchestrator
+from ..core.crypto import decrypt_field
 from ..core.database import async_session
 from ..core.diff_engine import apply_diff_to_file
-from ..core.exception_handler import GlobalExceptionHandler
+from ..core.exception_handler import GlobalExceptionHandler, safe_error_message
 from ..models.agent_profile import AgentProfile
 from ..models.message import Message
 from ..models.session import Session
@@ -56,17 +57,25 @@ async def build_conversation_history(
     db: AsyncSession,
     session_id: uuid.UUID,
     limit: int = 20,
+    exclude_id: uuid.UUID | None = None,
 ) -> list[AgentMessage]:
     """Fetch recent messages for a session and map to agent Message format.
 
     Returns messages ordered oldest-first (ascending created_at, id).
+
+    Args:
+        exclude_id: Optional message ID to exclude (e.g. the just-persisted
+            user message to avoid duplication with the orchestrator's own
+            user_content append).
     """
     stmt = (
         select(Message)
         .where(Message.session_id == session_id)
-        .order_by(Message.created_at.desc(), Message.id.desc())
-        .limit(limit)
     )
+    if exclude_id is not None:
+        stmt = stmt.where(Message.id != exclude_id)
+
+    stmt = stmt.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit)
     result = await db.execute(stmt)
     rows = result.scalars().all()
 
@@ -137,67 +146,81 @@ async def _handle_send_message(
         full_content = ""
         primary_agent_id = agent_roster[0].agent_id if agent_roster else ""
 
-        conversation_history = await build_conversation_history(db, session_uuid, limit=20)
+        conversation_history = await build_conversation_history(
+            db, session_uuid, limit=20, exclude_id=user_msg.id
+        )
 
-        async for event in orchestrator.process(session_id, content, agent_roster, conversation_history=conversation_history):
-            if isinstance(event, AgentStatusEvent):
-                await websocket.send_json({
-                    "type": "agentStatus",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "payload": {
-                        "sessionId": session_id,
-                        "agentId": event.agent_id,
-                        "status": event.status,
-                        "displayText": event.display_text,
-                    },
-                })
-            elif isinstance(event, MessageChunk):
-                full_content += event.content
-                chunk_index = getattr(event, "chunk_index", 0)
-                await websocket.send_json({
-                    "type": "messageChunk",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "payload": {
-                        "messageId": response_message_id,
-                        "sessionId": session_id,
-                        "agentId": event.agent_id or primary_agent_id,
-                        "chunkType": event.chunk_type,
-                        "deltaContent": event.content,
-                        "chunkIndex": chunk_index,
-                        "isFinal": event.is_final,
-                    },
-                })
+        try:
+            async for event in orchestrator.process(session_id, content, agent_roster, conversation_history=conversation_history):
+                if isinstance(event, AgentStatusEvent):
+                    await websocket.send_json({
+                        "type": "agentStatus",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "payload": {
+                            "sessionId": session_id,
+                            "agentId": event.agent_id,
+                            "status": event.status,
+                            "displayText": event.display_text,
+                        },
+                    })
+                elif isinstance(event, MessageChunk):
+                    full_content += event.content
+                    chunk_index = getattr(event, "chunk_index", 0)
+                    await websocket.send_json({
+                        "type": "messageChunk",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "payload": {
+                            "messageId": response_message_id,
+                            "sessionId": session_id,
+                            "agentId": event.agent_id or primary_agent_id,
+                            "chunkType": event.chunk_type,
+                            "deltaContent": event.content,
+                            "chunkIndex": chunk_index,
+                            "isFinal": event.is_final,
+                        },
+                    })
+        except Exception as exc:
+            logger.exception("Orchestrator failed for session %s: %s", session_id, exc)
+            error_code = GlobalExceptionHandler._classify_error(exc)
+            await websocket.send_json(_error_payload(
+                session_id,
+                error_code,
+                safe_error_message(error_code, exc),
+                recoverable=GlobalExceptionHandler._is_recoverable(exc),
+            ))
+            # Continue without closing the connection
+            return
 
-    agent_msg = Message(
-        session_id=session_uuid,
-        sender_type="agent",
-        sender_id=primary_agent_id,
-        content=full_content,
-        content_type="text",
-    )
-    db.add(agent_msg)
-    await db.execute(
-        update(Session)
-        .where(Session.id == session_uuid)
-        .values(updated_at=datetime.now(timezone.utc))
-    )
-    await db.commit()
-    await db.refresh(agent_msg)
+        agent_msg = Message(
+            session_id=session_uuid,
+            sender_type="agent",
+            sender_id=primary_agent_id,
+            content=full_content,
+            content_type="text",
+        )
+        db.add(agent_msg)
+        await db.execute(
+            update(Session)
+            .where(Session.id == session_uuid)
+            .values(updated_at=datetime.now(timezone.utc))
+        )
+        await db.commit()
+        await db.refresh(agent_msg)
 
-    await websocket.send_json({
-        "type": "messageComplete",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "payload": {
-            "id": str(agent_msg.id),
-            "sessionId": session_id,
-            "senderType": "agent",
-            "senderId": agent_msg.sender_id,
-            "content": full_content,
-            "contentType": "text",
-            "cardData": agent_msg.card_data,
-            "createdAt": agent_msg.created_at.isoformat() if agent_msg.created_at else datetime.now(timezone.utc).isoformat(),
-        },
-    })
+        await websocket.send_json({
+            "type": "messageComplete",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "payload": {
+                "id": str(agent_msg.id),
+                "sessionId": session_id,
+                "senderType": "agent",
+                "senderId": agent_msg.sender_id,
+                "content": full_content,
+                "contentType": "text",
+                "cardData": agent_msg.card_data,
+                "createdAt": agent_msg.created_at.isoformat() if agent_msg.created_at else datetime.now(timezone.utc).isoformat(),
+            },
+        })
 
 
 async def _handle_trigger_action(
@@ -310,6 +333,13 @@ async def websocket_endpoint(
 
     user_id_str = payload.get("sub")
 
+    # Convert token sub to UUID for proper comparison
+    try:
+        token_user_uuid = uuid.UUID(user_id_str) if user_id_str else None
+    except (ValueError, TypeError):
+        await websocket.close(code=4003, reason="Invalid user ID in token")
+        return
+
     await websocket.accept()
 
     async with async_session() as db:
@@ -331,7 +361,7 @@ async def websocket_endpoint(
             return
 
         # Verify session ownership
-        if user_id_str and str(session.user_id) != user_id_str:
+        if token_user_uuid and session.user_id != token_user_uuid:
             await websocket.close(code=4003, reason="Session does not belong to this user")
             return
 
@@ -345,6 +375,12 @@ async def websocket_endpoint(
             )
             for agent in result.scalars().all():
                 cfg = agent.agent_config or {}
+                # Decrypt api_key if present (stored encrypted by agents.py)
+                if cfg.get("api_key"):
+                    try:
+                        cfg = {**cfg, "api_key": decrypt_field(cfg["api_key"])}
+                    except Exception:
+                        pass  # Key may not be encrypted (legacy or global-key agents)
                 agent_roster.append(AgentDescriptor(
                     agent_id=str(agent.id),
                     name=agent.name,
@@ -352,13 +388,24 @@ async def websocket_endpoint(
                     adapter_type=agent.adapter_type,
                     description=agent.description,
                     system_prompt=agent.system_prompt,
-                    agent_config=agent.agent_config,
+                    agent_config=cfg,
                     skills=cfg.get("skills", []),
                 ))
 
         try:
             while True:
                 data = await websocket.receive_json()
+
+                # Check message size to prevent abuse
+                content = data.get("payload", {}).get("content", "")
+                if len(content) > 50000:  # 50KB limit
+                    await websocket.send_json(_error_payload(
+                        session_id,
+                        "PAYLOAD_TOO_LARGE",
+                        "Message content too long (max 50KB)",
+                        recoverable=True
+                    ))
+                    continue
 
                 validated = validate_ws_message(data)
                 if validated is None:

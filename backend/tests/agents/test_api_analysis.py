@@ -17,13 +17,13 @@ class TestUserRoutesLogic:
         from app.schemas.user import UserCreate
 
         # 正常情况
-        user = UserCreate(username="test", email="test@example.com")
+        user = UserCreate(username="test", email="test@example.com", password="12345678")
         assert user.username == "test"
         assert user.email == "test@example.com"
 
-        # 最小参数
-        user = UserCreate(username="minimal")
-        assert user.email is None
+        # 最小参数 — email is required (EmailStr), password is required
+        user = UserCreate(username="minimal", email="min@example.com", password="12345678")
+        assert user.email == "min@example.com"
         assert user.avatar is None
 
     def test_user_update_schema_validation(self):
@@ -40,11 +40,13 @@ class TestUserRoutesLogic:
         from app.schemas.user import UserRead
         from datetime import datetime
 
+        now = datetime.now()
         user = UserRead(
             id=uuid.uuid4(),
             username="test",
             email="test@example.com",
-            created_at=datetime.now()
+            created_at=now,
+            updated_at=now,
         )
         assert user.username == "test"
 
@@ -69,7 +71,7 @@ class TestSessionRoutesLogic:
         """测试会话创建默认标题"""
         from app.schemas.session import SessionCreate
 
-        session = SessionCreate(type="single", agent_ids=[])
+        session = SessionCreate(type="single", agent_ids=[uuid.uuid4()])
         assert session.title == "新对话"
 
     def test_session_update_schema_validation(self):
@@ -203,7 +205,7 @@ class TestApiResponseSchema:
         """测试ApiResponse泛型"""
         from app.schemas.common import ApiResponse
 
-        response = ApiResponse[list]([1, 2, 3])
+        response = ApiResponse(data=[1, 2, 3])
         assert response.data == [1, 2, 3]
 
 
@@ -264,7 +266,8 @@ class TestRegistryLogic:
 class TestBaseAdapterLogic:
     """BaseAdapter逻辑测试"""
 
-    def test_validate_messages_valid(self):
+    @pytest.mark.asyncio
+    async def test_validate_messages_valid(self):
         """测试消息验证 - 有效消息"""
         from app.agents.base_adapter import BaseAdapter, Message
 
@@ -279,9 +282,10 @@ class TestBaseAdapterLogic:
             Message(role="assistant", content="hi"),
             Message(role="system", content="system message")
         ]
-        assert adapter.validate_messages(messages) is True
+        assert await adapter.validate_messages(messages) is True
 
-    def test_validate_messages_invalid_role(self):
+    @pytest.mark.asyncio
+    async def test_validate_messages_invalid_role(self):
         """测试消息验证 - 无效角色"""
         from app.agents.base_adapter import BaseAdapter, Message
 
@@ -291,7 +295,7 @@ class TestBaseAdapterLogic:
 
         adapter = TestAdapter()
         messages = [ Message(role="invalid", content="hello") ]
-        assert adapter.validate_messages(messages) is False
+        assert await adapter.validate_messages(messages) is False
 
 
 class TestExceptionHandlerLogic:

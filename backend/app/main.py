@@ -1,3 +1,5 @@
+import logging
+import warnings
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,7 +11,17 @@ from .core.redis import close_redis
 from .models import SessionAgent  # noqa: F401 — ensure create_all sees it
 from .routes import agents, auth, messages, sessions, users, websocket
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
+
+# Startup safety checks
+if settings.SECRET_KEY == "change-me-in-production":
+    warnings.warn(
+        "SECRET_KEY is using the default value! Set the SECRET_KEY environment "
+        "variable before deploying to production.",
+        stacklevel=1,
+    )
 
 
 @asynccontextmanager

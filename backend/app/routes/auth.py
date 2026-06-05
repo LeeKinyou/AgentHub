@@ -1,5 +1,7 @@
 """Authentication routes: register, login, refresh, logout, me."""
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +14,7 @@ from ..core.auth import (
     hash_password,
     verify_password,
 )
+from ..core.config import get_settings
 from ..core.database import get_db
 from ..core.redis import get_redis_client
 from ..dependencies import get_current_user, oauth2_scheme
@@ -43,7 +46,6 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
     # Store refresh token in Redis
     redis = await get_redis_client()
-    from ..core.config import get_settings
     settings = get_settings()
     await redis.setex(f"refresh:{user.id}", settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400, refresh)
 
@@ -99,7 +101,6 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     new_access = encode_access_token(user.id, username=user.username)
     new_refresh = encode_refresh_token(user.id)
 
-    from ..core.config import get_settings
     settings = get_settings()
     await redis.setex(f"refresh:{user.id}", settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400, new_refresh)
 
@@ -122,8 +123,7 @@ async def logout(
         jti = payload.get("jti")
         exp = payload.get("exp")
         if jti and exp:
-            import time
-            ttl = max(int(exp - time.time()), 1)
+            ttl = max(int(exp - datetime.now(timezone.utc).timestamp()), 1)
             await redis.setex(f"bl:{jti}", ttl, "1")
     except Exception:
         pass

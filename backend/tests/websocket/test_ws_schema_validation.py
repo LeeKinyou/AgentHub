@@ -13,6 +13,7 @@ def test_ws_send_message_valid():
 
     msg = WSSendMessage.model_validate({
         "type": "sendMessage",
+        "timestamp": "2026-01-01T00:00:00Z",
         "payload": {
             "sessionId": "550e8400-e29b-41d4-a716-446655440000",
             "content": "hello",
@@ -30,6 +31,7 @@ def test_ws_send_message_missing_content():
     with pytest.raises(ValidationError):
         WSSendMessage.model_validate({
             "type": "sendMessage",
+            "timestamp": "2026-01-01T00:00:00Z",
             "payload": {
                 "sessionId": "550e8400-e29b-41d4-a716-446655440000",
             },
@@ -43,6 +45,7 @@ def test_ws_send_message_empty_content():
     with pytest.raises(ValidationError):
         WSSendMessage.model_validate({
             "type": "sendMessage",
+            "timestamp": "2026-01-01T00:00:00Z",
             "payload": {
                 "sessionId": "550e8400-e29b-41d4-a716-446655440000",
                 "content": "",
@@ -56,6 +59,7 @@ def test_ws_trigger_action_valid():
 
     msg = WSTriggerAction.model_validate({
         "type": "triggerAction",
+        "timestamp": "2026-01-01T00:00:00Z",
         "payload": {
             "messageId": "550e8400-e29b-41d4-a716-446655440000",
             "actionType": "applyDiff",
@@ -72,6 +76,7 @@ def test_ws_trigger_action_invalid_action_type():
     with pytest.raises(ValidationError):
         WSTriggerAction.model_validate({
             "type": "triggerAction",
+            "timestamp": "2026-01-01T00:00:00Z",
             "payload": {
                 "messageId": "550e8400-e29b-41d4-a716-446655440000",
                 "actionType": "unknownAction",
@@ -86,6 +91,7 @@ def test_ws_trigger_action_missing_message_id():
     with pytest.raises(ValidationError):
         WSTriggerAction.model_validate({
             "type": "triggerAction",
+            "timestamp": "2026-01-01T00:00:00Z",
             "payload": {
                 "actionType": "applyDiff",
             },
@@ -98,6 +104,7 @@ def test_ws_schemas_use_camel_case_aliases():
 
     msg = WSSendMessage.model_validate({
         "type": "sendMessage",
+        "timestamp": "2026-01-01T00:00:00Z",
         "payload": {
             "sessionId": "550e8400-e29b-41d4-a716-446655440000",
             "content": "test",
@@ -116,6 +123,7 @@ def test_validate_ws_message_dispatch():
     # Valid sendMessage
     result = validate_ws_message({
         "type": "sendMessage",
+        "timestamp": "2026-01-01T00:00:00Z",
         "payload": {
             "sessionId": "550e8400-e29b-41d4-a716-446655440000",
             "content": "hello",
@@ -127,6 +135,7 @@ def test_validate_ws_message_dispatch():
     # Valid triggerAction
     result = validate_ws_message({
         "type": "triggerAction",
+        "timestamp": "2026-01-01T00:00:00Z",
         "payload": {
             "messageId": "550e8400-e29b-41d4-a716-446655440000",
             "actionType": "applyDiff",
@@ -158,6 +167,7 @@ def test_validate_ws_message_returns_none_for_invalid():
 
     result = validate_ws_message({
         "type": "sendMessage",
+        "timestamp": "2026-01-01T00:00:00Z",
         "payload": {"sessionId": "not-a-uuid", "content": "test"},
     })
     assert result is None

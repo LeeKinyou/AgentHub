@@ -18,7 +18,7 @@ class SessionCreate(BaseModel):
 
 
 class SessionUpdate(BaseModel):
-    title: str | None = None
+    title: str | None = Field(None, max_length=255)
 
 
 class SessionRead(BaseModel):
