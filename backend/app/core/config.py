@@ -1,6 +1,22 @@
-from pydantic_settings import BaseSettings
+import json
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, EnvSettingsSource
 from functools import lru_cache
 from urllib.parse import quote_plus
+
+
+class _EnvSource(EnvSettingsSource):
+    """Custom env source that handles comma-separated list fields."""
+
+    def prepare_field_value(self, field_name, field, value, value_is_complex):
+        # Handle CORS_ORIGINS: accept both JSON array and comma-separated string
+        if field_name.lower().replace("-", "_") == "cors_origins" and isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return super().prepare_field_value(field_name, field, value, value_is_complex)
 
 
 class Settings(BaseSettings):
@@ -44,6 +60,15 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+
+    @classmethod
+    def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings):
+        return (
+            init_settings,
+            _EnvSource(settings_cls, env_settings.case_sensitive, env_settings.env_prefix, env_settings.env_nested_delimiter),
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     @property
     def DATABASE_URL(self) -> str:

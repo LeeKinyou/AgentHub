@@ -118,6 +118,8 @@ class Orchestrator:
 
     def __init__(self) -> None:
         self._adapters: dict[str, BaseAdapter] = {}
+        self._planner_client: anthropic.AsyncAnthropic | None = None
+        self._planner_api_key: str | None = None
 
     # ------------------------------------------------------------------ #
     #  Public entry point                                                  #
@@ -309,8 +311,12 @@ class Orchestrator:
         plan_model, plan_api_key = self._resolve_planner_credentials(agent_roster)
 
         try:
-            client = anthropic.AsyncAnthropic(api_key=plan_api_key)
-            response = await client.messages.create(
+            # Reuse cached client if API key matches
+            if self._planner_client is None or self._planner_api_key != plan_api_key:
+                self._planner_client = anthropic.AsyncAnthropic(api_key=plan_api_key)
+                self._planner_api_key = plan_api_key
+
+            response = await self._planner_client.messages.create(
                 model=plan_model,
                 max_tokens=1024,
                 system=PLANNING_SYSTEM_PROMPT,

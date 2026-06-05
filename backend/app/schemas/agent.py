@@ -56,9 +56,13 @@ class AgentProfileRead(AgentProfileBase):
 
     @model_serializer(mode="wrap")
     def _mask_api_key(self, handler) -> dict:
+        from ..core.crypto import decrypt_field
         data = handler(self)
         cfg = data.get("agent_config")
         if isinstance(cfg, dict) and "api_key" in cfg and cfg["api_key"]:
-            key = cfg["api_key"]
-            cfg["api_key"] = f"****{key[-4:]}" if len(key) > 4 else "****"
+            try:
+                real_key = decrypt_field(cfg["api_key"])
+            except Exception:
+                real_key = cfg["api_key"]  # Not encrypted (legacy data)
+            cfg["api_key"] = f"****{real_key[-4:]}" if len(real_key) > 4 else "****"
         return data

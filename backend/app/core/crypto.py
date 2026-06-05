@@ -13,7 +13,10 @@ def _get_fernet() -> Fernet:
         settings = get_settings()
         key = settings.ENCRYPTION_KEY
         if not key:
-            key = Fernet.generate_key().decode()
+            raise RuntimeError(
+                "ENCRYPTION_KEY is not configured. "
+                "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
         _fernet = Fernet(key.encode() if isinstance(key, str) else key)
     return _fernet
 

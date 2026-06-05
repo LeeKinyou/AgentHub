@@ -23,7 +23,7 @@ def test_agent_role_enum():
     """AgentProfileCreate should only accept valid role values."""
     from app.schemas.agent import AgentProfileCreate
 
-    valid_roles = ["frontend", "backend", "fullstack", "designer", "devops", "planner"]
+    valid_roles = ["orchestrator", "expert"]
     uid = "00000000-0000-0000-0000-000000000001"
 
     for role in valid_roles:
@@ -42,11 +42,11 @@ def test_adapter_type_enum():
     valid_types = ["claude_code", "codex", "opencode", "custom"]
 
     for at in valid_types:
-        a = AgentProfileCreate(user_id=uid, name="test", role="frontend", adapter_type=at)
+        a = AgentProfileCreate(user_id=uid, name="test", role="expert", adapter_type=at)
         assert a.adapter_type == at
 
     with pytest.raises(ValidationError):
-        AgentProfileCreate(user_id=uid, name="test", role="frontend", adapter_type="malicious")
+        AgentProfileCreate(user_id=uid, name="test", role="expert", adapter_type="malicious")
 
 
 def test_sender_type_enum():

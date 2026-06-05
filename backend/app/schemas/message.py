@@ -13,7 +13,7 @@ def _to_camel(s: str) -> str:
 class DiffHunk(BaseModel):
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
-    old_start: int = Field(ge=1)
+    old_start: int = Field(ge=0)  # 0 means new file creation
     old_lines: int = Field(ge=0)
     new_start: int = Field(ge=1)
     new_lines: int = Field(ge=0)

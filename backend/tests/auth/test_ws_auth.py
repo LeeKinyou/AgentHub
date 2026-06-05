@@ -23,14 +23,11 @@ def test_ws_endpoint_token_is_optional():
 
 
 def test_ws_endpoint_verifies_session_ownership():
-    """websocket_endpoint should check session.user_id against token's user."""
-    import ast, textwrap
-    source = open(
-        __import__("os").path.join(
-            __import__("os").path.dirname(__file__), "..", "app", "routes", "websocket.py"
-        )
-    ).read()
-    # Check that the code compares session.user_id with user_id_str
-    assert "session.user_id" in source and "user_id_str" in source, (
-        "WebSocket endpoint should verify session ownership"
+    """websocket_endpoint should check session.user_id against token's user UUID."""
+    import inspect
+    from app.routes import websocket
+    source = inspect.getsource(websocket.websocket_endpoint)
+    # Check that the code compares session.user_id with a UUID derived from token
+    assert "session.user_id" in source and "token_user_uuid" in source, (
+        "WebSocket endpoint should verify session ownership via UUID comparison"
     )
