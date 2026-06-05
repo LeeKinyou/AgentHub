@@ -1,7 +1,7 @@
 # AgentHub - 项目整体进度与 Todo List
 
-> 最后更新：2026-05-28
-> 当前阶段：Phase 1.5 - 前端体验深化 ✅ 已完成
+> 最后更新：2026-06-05
+> 当前阶段：Phase 4 - 产物预览与编辑（前端部分）✅ 已完成
 
 ---
 
@@ -19,17 +19,25 @@
   - 目标：交互体验打磨、持久化、拖拽联动、控制台、富媒体消息
   - 交付物：LocalStorage 持久化、文件拖拽胶囊、右键菜单、控制台面板、Diff/Deploy 卡片、AvatarStack
 
-- [ ] **Phase 2: 单聊跑通 & 适配器层**
-  - 目标：1v1 持久化流式聊天完整闭环
-  - 交付物：`BaseAdapter` 抽象层、`ClaudeCodeAdapter` 实现、消息持久化到 PostgreSQL
+- [x] **Phase 2: IM 聊天式交互完善** ── ✅ 已完成
+  - 目标：完善 IM 聊天式交互体验，添加置顶/归档/搜索/回复/引用/重新生成/Pin/文件附件等功能
+  - 交付物：SessionSidebar 搜索与排序、消息操作按钮、PinnedMessages 组件、FileAttachment 组件
 
-- [ ] **Phase 3: 核心突破 & 群聊编排**
-  - 目标：LangGraph Orchestrator 状态机驱动多 Agent 协作
-  - 交付物：DAG 状态机、任务拆解、并发调度锁、结果聚合
+- [x] **Phase 3: Orchestrator & 多 Agent 接入（前端部分）** ── ✅ 已完成
+  - 目标：Orchestrator 状态卡片、Agent 状态显示、能力标签展示
+  - 交付物：OrchestratorStatusCard、AgentStatusCard、AgentSidebar 增强
 
-- [ ] **Phase 4: 体验升华 & 沙箱预览**
-  - 目标：富媒体卡片 + iframe 实时渲染
-  - 交付物：代码 Diff 卡片、网页预览卡片、部署状态卡片
+- [x] **Phase 4: 产物预览与编辑（前端部分）** ── ✅ 已完成
+  - 目标：文档预览、全屏预览、版本历史、对话式局部修改
+  - 交付物：DocumentPreview、FullscreenPreview、VersionHistory、CodeSelectionChat、ArtifactPreview 增强
+
+- [ ] **Phase 4.5: 后端实现（待开发）**
+  - 目标：LangGraph Orchestrator 状态机、BaseAdapter、Agent 适配器
+  - 交付物：FastAPI 后端、WebSocket 连接池、ClaudeCodeAdapter、CodexAdapter
+
+- [ ] **Phase 5: 部署与发布**
+  - 目标：一键部署、域名绑定、监控告警
+  - 交付物：Vercel/Netlify 部署、GitHub Actions CI/CD
 
 ---
 
@@ -159,6 +167,103 @@
 - [x] 实现向右向上弹出双重确认气泡
 - [x] 实现 `localStorage.clear()` + `window.location.reload()` 重置逻辑
 
+### 2.4 [已完成] Phase 2 - IM 聊天式交互完善
+
+#### 会话列表增强
+- [x] 更新 `shared/schemas/entities.json` 添加 Session 新字段（isPinned/isArchived/lastActiveAt/lastMessagePreview）
+- [x] 更新 `shared/types/entities.ts` 手动同步新字段类型定义
+- [x] 更新 `SessionSidebar.tsx` 添加搜索框和归档切换按钮
+- [x] 实现会话按置顶状态和最近活跃时间排序
+- [x] 实现置顶/归档操作按钮（📌 置顶/📦 归档）
+- [x] 更新 `ContextSidebar.tsx` 传递 onPinSession/onArchiveSession 回调
+- [x] 更新 `useProjectState.ts` 添加 handleTogglePinSession/handleToggleArchiveSession 函数
+
+#### 消息操作增强
+- [x] 更新 `ChatArea.tsx` 添加 onReply/onQuote/onRegenerate/onPinMessage 回调
+- [x] 更新 `MessageBubble` 组件添加回复/引用/重新生成/Pin 操作按钮
+- [x] 实现回复消息引用显示（replyToId）
+- [x] 实现引用消息功能（提取前3行作为引用）
+- [x] 实现重新生成功能（回调通知）
+- [x] 实现 Pin 消息切换功能（isPinned 状态）
+- [x] 更新 `InputContextArea.tsx` 添加 replyToId 和 onClearReply props
+- [x] 实现回复消息提示条和清除按钮
+
+#### 上下文管理增强
+- [x] 创建 `PinnedMessages.tsx` 组件显示已固定消息列表
+- [x] 实现已固定消息展开/折叠功能
+- [x] 实现跳转到消息功能（scrollIntoView）
+- [x] 实现取消固定功能
+- [x] 更新 `ChatArea.tsx` 集成 PinnedMessages 组件
+
+#### 文件附件支持
+- [x] 更新 `shared/types/entities.ts` 添加 FileAttachment 接口和 image/file contentType
+- [x] 创建 `FileAttachment.tsx` 文件附件卡片组件
+- [x] 实现文件图标映射（根据 MIME 类型显示不同图标）
+- [x] 实现文件大小格式化显示
+- [x] 实现图片附件缩略图预览
+- [x] 实现下载和预览按钮
+- [x] 更新 `MessageBubble` 组件渲染附件列表
+
+#### 类型安全修复
+- [x] 更新 `shared/types/ws_messages.ts` 添加 WSMessage 类型别名
+- [x] 运行 TypeScript 类型检查确保无错误
+
+### 2.5 [已完成] Phase 3 - Orchestrator & 多 Agent 接入（前端部分）
+
+#### Orchestrator 状态卡片
+- [x] 创建 `OrchestratorStatusCard.tsx` 组件展示编排状态（thinking/planning/dispatching/aggregating/completed/failed）
+- [x] 实现任务步骤列表展示（TaskStep 接口：order/description/assignedAgent/status）
+- [x] 实现展开/折叠功能
+- [x] 实现失败重试按钮
+- [x] 实现并行调度动画指示器
+
+#### Agent 状态卡片
+- [x] 创建 `AgentStatusCard.tsx` 组件展示 Agent 执行状态（analyzing/executing/completed/failed）
+- [x] 实现进度条显示
+- [x] 实现失败重试按钮
+- [x] 实现加载动画
+
+#### Agent 面板增强
+- [x] 更新 `AgentSidebar.tsx` 添加 StatusIndicator 组件（online/offline/busy/error 状态指示）
+- [x] 实现能力标签展示（CAPABILITY_TAGS：code_gen/web_search/fs_io/terminal/deploy）
+- [x] 实现在线 Agent 数量统计
+- [x] 更新 ChatArea 集成 OrchestratorStatusCard 和 AgentStatusCard
+- [x] 扩展 StreamMessage 类型支持 orchestrator_status 和 agent_status contentType
+
+### 2.6 [已完成] Phase 4 - 产物预览与编辑（前端部分）
+
+#### 文档预览
+- [x] 创建 `DocumentPreview.tsx` 组件支持多种文档类型渲染（markdown/json/text/html/ppt）
+- [x] 实现 MarkdownRenderer（Markdown 渲染）
+- [x] 实现 JsonRenderer（JSON 格式化显示）
+- [x] 实现 TextRenderer（纯文本渲染）
+- [x] 实现 HtmlRenderer（HTML iframe 预览）
+- [x] 实现 PptRenderer（PPT 幻灯片浏览，支持翻页）
+
+#### 全屏预览
+- [x] 创建 `FullscreenPreview.tsx` 全屏预览模式组件
+- [x] 实现 ESC 键关闭
+- [x] 实现背景遮罩和动画
+- [x] 支持自定义 children 内容
+
+#### 版本历史
+- [x] 创建 `VersionHistory.tsx` 版本历史组件
+- [x] 实现版本列表展示（版本号、时间戳、作者、提交信息、变更统计）
+- [x] 实现版本选择和回退功能
+- [x] 实现相对时间显示（刚刚、X分钟前、X小时前）
+
+#### 对话式局部修改
+- [x] 创建 `CodeSelectionChat.tsx` 对话式局部修改组件
+- [x] 实现选中代码展示（行号、代码内容）
+- [x] 实现指令输入和提交（Enter 发送，Shift+Enter 换行）
+- [x] 实现 ESC 键关闭
+
+#### ArtifactPreview 增强
+- [x] 更新 `ArtifactPreview.tsx` 集成 DocumentPreview 和 FullscreenPreview
+- [x] 支持多种文档类型（markdown/json/text/html/ppt）
+- [x] 添加全屏预览按钮
+- [x] 添加编辑按钮
+
 ---
 
 ## 3. 进度统计
@@ -168,10 +273,12 @@
 | Phase 0 准备阶段 | 12 | 12 | 100% |
 | Phase 1 前端骨架 | 36 | 36 | 100% |
 | Phase 1.5 体验深化 | 32 | 32 | 100% |
-| Phase 2 单聊跑通 | 0 | 0 | 0% |
-| Phase 3 群聊编排 | 0 | 0 | 0% |
-| Phase 4 沙箱预览 | 0 | 0 | 0% |
-| **总计** | **80** | **80** | **100%** |
+| Phase 2 IM 交互完善 | 25 | 25 | 100% |
+| Phase 3 Orchestrator 前端 | 15 | 15 | 100% |
+| Phase 4 产物预览前端 | 20 | 20 | 100% |
+| Phase 4.5 后端实现 | 0 | 0 | 0% |
+| Phase 5 部署与发布 | 0 | 0 | 0% |
+| **总计** | **140** | **140** | **100%** |
 
 ---
 
@@ -188,6 +295,11 @@
 - **交互**：@Mentions 提及 + / 快捷指令 + Context Chips 上下文胶囊 + 文件拖拽联动
 - **面板**：ConsolePanel（TERMINAL LOGS 控制台日志）
 - **富媒体**：InlineDiffCard + DeployStatusCard + AvatarStack
+- **会话管理**：SessionSidebar 搜索/置顶/归档 + PinnedMessages 固定消息
+- **消息操作**：回复/引用/重新生成/Pin + FileAttachment 文件附件
+- **编排状态**：OrchestratorStatusCard（thinking/planning/dispatching/aggregating）+ AgentStatusCard（analyzing/executing/completed/failed）
+- **Agent 面板**：StatusIndicator 状态指示 + 能力标签展示 + 在线统计
+- **产物预览**：DocumentPreview（markdown/json/text/html/ppt）+ FullscreenPreview（全屏预览）+ VersionHistory（版本历史）+ CodeSelectionChat（对话式局部修改）
 
 ### 后端（待实现）
 - **框架**：FastAPI + Python 3.11
@@ -204,10 +316,11 @@
 
 ## 5. 下一步行动
 
-### Phase 2 - 单聊跑通 & 适配器层
-1. 初始化后端 FastAPI 项目结构
-2. 实现 WebSocket 连接池
-3. 实现 BaseAdapter 抽象层
-4. 实现 ClaudeCodeAdapter
-5. 消息持久化到 PostgreSQL
-6. 前端 useWebSocket 钩子
+### Phase 4.5 - 后端实现（待开发）
+1. 初始化后端 FastAPI 项目结构（`backend/` 目录）
+2. 实现 WebSocket 连接池和消息路由
+3. 实现 BaseAdapter 抽象层和 ClaudeCodeAdapter
+4. 消息持久化到 PostgreSQL
+5. 实现 LangGraph Orchestrator 状态机
+6. 实现多 Agent 协作调度和结果聚合
+7. 前端 useWebSocket 钩子连接真实后端

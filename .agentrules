@@ -17,7 +17,7 @@
 - **技术栈硬限制**：必须且仅能使用 Tailwind CSS 编写样式。严禁引入任何第三方未授权的 CSS/SCSS 库。
 - **类型安全**：所有与消息（Message）、会话（Session）、智能体（Agent）交互的数据类型，必须通过 `shared` 包引入。**严禁使用 `any`**，TS 检查（`npm run type-check`）报错的代码一律视为垃圾代码。
 - **组件原子化**：基础 UI 组件请查阅并使用 `src/components/ui/`（Shadcn UI）。单个业务组件文件代码禁止超过 150 行，超出必须进行逻辑拆分。
-
+- **接口契约绝对服从 (Strict API Contract Adherence)**：【高危红线】前端【绝对禁止】私自在业务代码中新增、修改、废弃或拼接任何 HTTP 路由路径及 WebSocket 事件。所有接口的 Request Payload 和 Response 数据必须 100% 依赖并映射到 `shared/` 目录自动生成的类型上。如需变更接口字段，必须优先提请修改 `shared/schemas/`，严禁在前端私自手写 Mock 字段、使用硬编码覆盖、或在代码中留下诸如 `// TODO: 联调时再改` 的未定义字段。
 ## 4. 后端开发硬约束 (Backend Code Harness)
 - **统一适配器层**：任何针对外部 LLM (Claude Code, Codex) 的调用，必须继承并实现 `app/agents/base_adapter.py`，严禁在路由（API 路由）中直接手写原生大模型接口调用。
 - **数据合规**：所有 REST 和 WebSocket 路由的输入输出，必须经过 `app/schemas/` 中的 Pydantic 模型严格校验。
