@@ -42,11 +42,11 @@ export function FileAttachment({ attachment, onDownload, onPreview }: FileAttach
   const isImageFile = isImage(attachment.type);
 
   return (
-    <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden bg-white dark:bg-zinc-800 max-w-xs">
+    <div className="border border-minimal-border rounded-minimal overflow-hidden bg-white max-w-xs">
       {isImageFile && attachment.thumbnailUrl ? (
         <button
           onClick={() => onPreview?.(attachment)}
-          className="w-full aspect-video bg-zinc-100 dark:bg-zinc-900 overflow-hidden hover:opacity-90 transition-opacity"
+          className="w-full aspect-video bg-minimal-bg overflow-hidden hover:opacity-90 transition-opacity duration-300"
         >
           <img
             src={attachment.thumbnailUrl}
@@ -58,10 +58,10 @@ export function FileAttachment({ attachment, onDownload, onPreview }: FileAttach
       <div className="flex items-center gap-3 p-3">
         <span className="text-2xl shrink-0">{icon}</span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">
+          <p className="text-sm font-medium text-minimal-text truncate">
             {attachment.name}
           </p>
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+          <p className="text-[11px] text-minimal-secondary">
             {formatFileSize(attachment.size)}
           </p>
         </div>
@@ -69,7 +69,7 @@ export function FileAttachment({ attachment, onDownload, onPreview }: FileAttach
           {onPreview && (
             <button
               onClick={() => onPreview(attachment)}
-              className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+              className="p-1.5 rounded hover:bg-minimal-bg text-minimal-tertiary hover:text-minimal-text transition-colors duration-300"
               title="预览"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,7 +81,7 @@ export function FileAttachment({ attachment, onDownload, onPreview }: FileAttach
           {onDownload && (
             <button
               onClick={() => onDownload(attachment)}
-              className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+              className="p-1.5 rounded hover:bg-minimal-bg text-minimal-tertiary hover:text-minimal-text transition-colors duration-300"
               title="下载"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

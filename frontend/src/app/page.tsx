@@ -57,9 +57,9 @@ function buildFileTreeText(node: FileNode, prefix = '', isLast = true): string {
 
 function EmptyState({ text, sub }: { text: string; sub: string }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-zinc-400 dark:text-zinc-600">
-      <div className="w-20 h-20 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center"><span className="text-3xl">📂</span></div>
-      <div className="text-center space-y-1"><p className="text-sm text-zinc-500 dark:text-zinc-400">{text}</p><p className="text-xs text-zinc-400 dark:text-zinc-600">{sub}</p></div>
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-minimal-secondary">
+      <div className="w-16 h-16 rounded-minimal bg-minimal-bg border border-minimal-border flex items-center justify-center"><span className="text-2xl">📂</span></div>
+      <div className="text-center space-y-1"><p className="text-sm text-minimal-text">{text}</p><p className="text-xs text-minimal-secondary">{sub}</p></div>
     </div>
   );
 }
@@ -584,12 +584,12 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200">
+    <div className="flex h-screen w-screen overflow-hidden bg-minimal-bg dark:bg-minimal-dark-bg text-minimal-text dark:text-minimal-dark-text">
       <ProjectDock projects={state.projects} activeProjectId={state.activeProjectId} theme={theme} onSelectProject={handleSelectProjectAndExpand} onOpenProject={state.handleOpenProject} onNewProject={() => setIsCreateProjectOpen(true)} onDeleteProject={state.handleDeleteProject} onThemeChange={setTheme} onOpenSettings={() => setIsSettingsOpen(true)} />
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         <div className="flex-1 flex min-h-0 w-full overflow-hidden">
           {state.activeProject && state.activeFileTree && (
-            <div className={`${isFilesExpanded ? 'w-60' : 'w-0'} h-full border-r border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all duration-200 shrink-0 bg-zinc-50 dark:bg-zinc-900/30`}>
+            <div className={`${isFilesExpanded ? 'w-60' : 'w-0'} h-full border-r border-minimal-glass-border dark:border-minimal-dark-border overflow-hidden transition-all duration-300 shrink-0 bg-minimal-glass/50 dark:bg-minimal-dark-glass/50 backdrop-blur-xl`}>
               <FileExplorer root={state.activeFileTree} activeFileName={activeTab?.name ?? null} onOpenFile={handleOpenFile} onOpenFileTransient={handleOpenFileTransient} onFileAction={state.handleFileAction} onReauthorize={handleReauthorize} />
             </div>
           )}

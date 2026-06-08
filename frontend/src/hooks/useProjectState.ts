@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { openDirectoryPicker } from '@/components/im/fileSystemUtils';
+import { openDirectoryPicker, traverseDirectory } from '@/components/im/fileSystemUtils';
 import type { Project } from '@/components/im/mockProjects';
 import type { Session } from '@agenthub/shared/types/entities';
 import type { FileNode } from '@/components/im/mockFiles';
+import { saveDirHandle, getDirHandle, deleteDirHandle } from '@/utils/handleStore';
 
 const KEYS = {
   projects: 'agenthub_projects',
@@ -36,6 +37,28 @@ export function useProjectState() {
   const activeSession = activeProject?.sessions.find((s) => s.id === activeSessionId) ?? null;
   const activeFileTree = activeProjectId ? (realFileTrees[activeProjectId] ?? activeProject?.fileTree) : null;
 
+  // Restore file trees from IndexedDB handles on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      for (const proj of projects) {
+        if (cancelled) break;
+        if (realFileTrees[proj.id]) continue; // already have a live tree
+        try {
+          const dirHandle = await getDirHandle(proj.id);
+          if (dirHandle && !cancelled) {
+            const children = await traverseDirectory(dirHandle);
+            if (!cancelled && children.length > 0) {
+              const tree: FileNode = { name: dirHandle.name, type: 'dir', children, dirHandle };
+              setRealFileTrees((prev) => ({ ...prev, [proj.id]: tree }));
+            }
+          }
+        } catch { /* ignore */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projects]);
+
   // Sync activeSessionId if it becomes stale (e.g., session deleted externally)
   useEffect(() => {
     if (activeProject && activeSessionId && !activeProject.sessions.find((s) => s.id === activeSessionId)) {
@@ -50,7 +73,9 @@ export function useProjectState() {
 
   const handleDeleteProject = useCallback((projectId: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    setRealFileTrees((prev) => { const next = { ...prev }; delete next[projectId]; return next; });
     if (activeProjectId === projectId) { setActiveProjectId(null); setActiveSessionId(null); }
+    deleteDirHandle(projectId).catch(() => {});
   }, [activeProjectId]);
 
   const handleDeleteSession = useCallback((sessionId: string) => {
@@ -72,10 +97,15 @@ export function useProjectState() {
   const handleOpenProject = useCallback(async () => {
     const fileTree = await openDirectoryPicker();
     if (!fileTree) return;
-    const newProject: Project = { id: crypto.randomUUID(), name: fileTree.name, icon: '📁', fileTree, sessions: [] };
+    const newId = crypto.randomUUID();
+    const newProject: Project = { id: newId, name: fileTree.name, icon: '📁', fileTree, sessions: [] };
     setProjects((prev) => [...prev, newProject]);
-    setActiveProjectId(newProject.id);
+    setActiveProjectId(newId);
     setActiveSessionId(null);
+    setRealFileTrees((prev) => ({ ...prev, [newId]: fileTree }));
+    if (fileTree.dirHandle) {
+      await saveDirHandle(newId, fileTree.dirHandle);
+    }
   }, []);
 
   const handleNewProject = useCallback(() => {
@@ -85,14 +115,16 @@ export function useProjectState() {
     setActiveSessionId(null);
   }, []);
 
-  const createProject = useCallback((name: string, icon: string, fileTree: FileNode, parentDirHandle?: FileSystemDirectoryHandle) => {
+  const createProject = useCallback(async (name: string, icon: string, fileTree: FileNode, parentDirHandle?: FileSystemDirectoryHandle) => {
     const newId = crypto.randomUUID();
     const newProject: Project = { id: newId, name, icon, fileTree, sessions: [] };
     setProjects((prev) => [...prev, newProject]);
     setActiveProjectId(newId);
     setActiveSessionId(null);
-    // Store the real file tree so the sidebar displays the project folder
     setRealFileTrees((prev) => ({ ...prev, [newId]: fileTree }));
+    if (parentDirHandle) {
+      await saveDirHandle(newId, parentDirHandle);
+    }
   }, []);
 
   const handleOpenFile = useCallback(async (name: string, handle: FileSystemFileHandle) => {

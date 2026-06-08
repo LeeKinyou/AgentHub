@@ -21,24 +21,24 @@ const MOCK_DIFF_LINES = [
 ];
 
 const LINE_STYLES: Record<string, string> = {
-  added: 'bg-emerald-500/10 text-emerald-400',
-  removed: 'bg-red-500/10 text-red-400',
-  normal: 'text-zinc-500',
+  added: 'bg-minimal-success/10 text-minimal-success',
+  removed: 'bg-minimal-error/10 text-minimal-error',
+  normal: 'text-minimal-secondary',
 };
 
 export function InlineDiffCard({ fileName = 'untitled.tsx', onApply }: InlineDiffCardProps) {
   return (
-    <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-zinc-50 dark:bg-zinc-900/50 w-full max-w-2xl text-xs font-mono">
-      <div className="flex items-center justify-between px-3 py-2 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-        <span className="text-zinc-600 dark:text-zinc-400 truncate">{fileName}</span>
-        <button onClick={onApply} className="px-2 py-0.5 rounded-md bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600/20 dark:hover:bg-indigo-500/30 transition-colors shrink-0">
-          ✨ Apply to File
+    <div className="border border-minimal-glass-border rounded-minimal overflow-hidden bg-minimal-glass/60 backdrop-blur-xl w-full max-w-2xl text-xs font-mono shadow-minimal-glow">
+      <div className="flex items-center justify-between px-3 py-2 bg-white/60 backdrop-blur-sm border-b border-minimal-glass-border">
+        <span className="text-minimal-secondary truncate">{fileName}</span>
+        <button onClick={onApply} className="px-2 py-0.5 rounded-minimal bg-minimal-accent/10 text-minimal-accent hover:bg-minimal-accent/20 transition-colors duration-300 shrink-0">
+          Apply to File
         </button>
       </div>
       <div className="p-2 max-h-[200px] overflow-y-auto">
         {MOCK_DIFF_LINES.map((line, i) => (
           <div key={i} className={`px-2 py-0.5 rounded ${LINE_STYLES[line.type] ?? LINE_STYLES.normal}`}>
-            <span className="text-zinc-600 mr-2 select-none">{line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}</span>
+            <span className="text-minimal-tertiary mr-2 select-none">{line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}</span>
             <span>{line.content}</span>
           </div>
         ))}

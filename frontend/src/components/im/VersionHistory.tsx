@@ -46,16 +46,16 @@ export function VersionHistory({ versions, currentVersionId, onSelectVersion, on
   };
 
   return (
-    <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900">
-      <div className="flex items-center justify-between px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800">
+    <div className="border border-minimal-glass-border rounded-minimal overflow-hidden bg-white/80 backdrop-blur-sm shadow-minimal-glow">
+      <div className="flex items-center justify-between px-4 py-3 bg-minimal-glass/40 backdrop-blur-xl border-b border-minimal-glass-border">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">📋 版本历史</span>
-          <span className="text-xs text-zinc-500">{versions.length} 个版本</span>
+          <span className="text-sm font-medium text-minimal-text">版本历史</span>
+          <span className="text-xs text-minimal-secondary">{versions.length} 个版本</span>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+            className="p-1 rounded hover:bg-minimal-border text-minimal-tertiary hover:text-minimal-text transition-colors duration-300"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -68,27 +68,27 @@ export function VersionHistory({ versions, currentVersionId, onSelectVersion, on
           <div
             key={version.id}
             onClick={() => handleSelect(version.id)}
-            className={`group flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors ${
+            className={`group flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors duration-300 ${
               selectedId === version.id
-                ? 'bg-indigo-50 dark:bg-indigo-500/10 border-l-2 border-indigo-500'
-                : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border-l-2 border-transparent'
-            } ${idx === 0 ? '' : 'border-t border-zinc-100 dark:border-zinc-800'}`}
+                ? 'bg-minimal-accent/5 border-l-2 border-minimal-accent'
+                : 'hover:bg-minimal-bg border-l-2 border-transparent'
+            } ${idx === 0 ? '' : 'border-t border-minimal-border'}`}
           >
             <div className="flex flex-col items-center mt-1">
-              <div className={`w-2 h-2 rounded-full ${selectedId === version.id ? 'bg-indigo-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
-              {idx < versions.length - 1 && <div className="w-0.5 h-full bg-zinc-200 dark:bg-zinc-700 mt-1" />}
+              <div className={`w-2 h-2 rounded-full ${selectedId === version.id ? 'bg-minimal-accent' : 'bg-minimal-border'}`} />
+              {idx < versions.length - 1 && <div className="w-0.5 h-full bg-minimal-border mt-1" />}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-zinc-500">{version.version}</span>
-                <span className="text-xs text-zinc-400">{formatTimestamp(version.timestamp)}</span>
+                <span className="text-xs font-mono text-minimal-secondary">{version.version}</span>
+                <span className="text-xs text-minimal-tertiary">{formatTimestamp(version.timestamp)}</span>
               </div>
-              <p className="text-sm text-zinc-700 dark:text-zinc-300 mt-0.5 truncate">{version.message}</p>
+              <p className="text-sm text-minimal-text mt-0.5 truncate">{version.message}</p>
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-xs text-zinc-500">{version.author}</span>
+                <span className="text-xs text-minimal-secondary">{version.author}</span>
                 <div className="flex items-center gap-1 text-xs">
-                  <span className="text-green-500">+{version.changes.additions}</span>
-                  <span className="text-red-500">-{version.changes.deletions}</span>
+                  <span className="text-minimal-success">+{version.changes.additions}</span>
+                  <span className="text-minimal-error">-{version.changes.deletions}</span>
                 </div>
               </div>
             </div>
@@ -98,7 +98,7 @@ export function VersionHistory({ versions, currentVersionId, onSelectVersion, on
                   e.stopPropagation();
                   onRevert(version.id);
                 }}
-                className="px-2 py-1 text-xs bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="px-2 py-1 text-xs bg-minimal-border text-minimal-secondary rounded-minimal opacity-0 group-hover:opacity-100 transition-opacity duration-300"
               >
                 回退
               </button>

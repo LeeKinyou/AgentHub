@@ -64,6 +64,7 @@ export function useEditorTabs() {
         }
       } catch (err) {
         console.error('读取文件失败:', err);
+        throw err;
       }
     },
     [getProjectTabs],
