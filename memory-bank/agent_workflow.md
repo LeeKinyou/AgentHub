@@ -1,7 +1,7 @@
 # AgentHub - Agent 协作状态流转设计
 
-> 文档版本：v1.0
-> 最后更新：2026-05-27
+> 文档版本：v1.1
+> 最后更新：2026-06-08
 > 状态机引擎：LangGraph (Python)
 
 ---
@@ -641,6 +641,149 @@ async def extend_lock_ttl(session_id: str, lock: SessionLock):
 
 ---
 
+## 5. Agent 数据库状态生命周期 (DB-Level Status Lifecycle)
+
+### 5.1 `AgentProfile.status` 字段
+
+`agent_profiles.status`（VARCHAR(20)）在数据库层面追踪每个 Agent 的运行时状态，与 LangGraph 状态机协同工作。
+
+**状态枚举**：`offline` | `busy` | `online` | `error`
+
+### 5.2 状态流转图
+
+```
+┌──────────┐
+│ offline  │ ◄── Agent 初始/离线状态
+└────┬─────┘
+     │ 用户发送消息（sendMessage）
+     │ UPDATE agent_profiles SET status='busy'
+     │ WHERE id IN (参与的 agent_ids)
+     ▼
+┌──────────┐
+│   busy   │ ◄── Agent 正在执行任务
+└──┬───┬───┘
+   │   │
+   │   │ Orchestrator 抛出异常
+   │   │ 或收到 AgentStatusEvent(status="failed")
+   │   ▼
+   │ ┌──────────┐
+   │ │  error   │ ◄── Agent 执行异常
+   │ └──────────┘
+   │
+   │ 收到 AgentStatusEvent(status="completed")
+   │ UPDATE agent_profiles SET status='online'
+   ▼
+┌──────────┐
+│  online  │ ◄── Agent 就绪可用
+└──────────┘
+```
+
+### 5.3 状态转换代码路径
+
+| 转换 | 触发点 | 代码位置 |
+|------|--------|----------|
+| `*` → `busy` | 用户发送 sendMessage | `websocket.py` `_handle_send_message` 中，进入 `guard.message_lock()` 后立即 `UPDATE ... SET status='busy'` |
+| `busy` → `online` | Agent 完成 | `websocket.py` 收到 `AgentStatusEvent(status="completed")` 时 `UPDATE ... SET status='online'` |
+| `busy` → `error` | Agent 失败 | `websocket.py` 收到 `AgentStatusEvent(status="failed")` 或 `except` 块中 `UPDATE ... SET status='error'` |
+| `busy`/`error` → `online` | WS 断开清理 | `websocket.py` `finally` 块：`WHERE status IN ('busy','error') SET status='online'` |
+
+### 5.4 断开连接清理 (Disconnect Cleanup)
+
+当 WebSocket 连接意外断开时，`finally` 块确保不会留下卡死的 `busy` 状态：
+
+```python
+# websocket.py finally 块
+finally:
+    await orchestrator.cleanup()
+    # 重置 busy/error Agent 为 online，防止状态卡死
+    agent_uuids = [uuid.UUID(a.agent_id) for a in agent_roster if a.agent_id]
+    if agent_uuids:
+        await db.execute(
+            update(AgentProfile)
+            .where(
+                AgentProfile.id.in_(agent_uuids),
+                AgentProfile.status.in_(["busy", "error"])
+            )
+            .values(status="online")
+        )
+        await db.commit()
+```
+
+---
+
+## 6. WebSocket 并发控制 (WebSocketSessionGuard)
+
+### 6.1 设计目标
+
+每个 WebSocket 连接实例化一个 `WebSocketSessionGuard`，解决两个并发问题：
+1. **消息锁定**：同一连接同时只能处理一条消息（防止 Agent 并发冲突）
+2. **频率限制**：防止用户快速连发消息导致后端过载
+
+### 6.2 WebSocketSessionGuard 实现
+
+```python
+class WebSocketSessionGuard:
+    """Per-connection concurrency control and rate limiting."""
+
+    def __init__(self, min_interval_seconds: float = 1.0):
+        self._lock = asyncio.Lock()           # 消息处理锁
+        self._min_interval = min_interval_seconds  # 最小发送间隔
+        self._last_send_time: float = 0.0
+
+    @asynccontextmanager
+    async def message_lock(self):
+        """获取消息处理锁，确保同一时间只处理一条消息"""
+        async with self._lock:
+            yield
+
+    def can_accept_message(self) -> bool:
+        """检查是否有消息正在处理"""
+        return not self._lock.locked()
+
+    def check_rate_limit(self) -> bool:
+        """检查是否满足最小发送间隔"""
+        if self._last_send_time == 0.0:
+            return True
+        return (time.monotonic() - self._last_send_time) >= self._min_interval
+
+    def record_send_time(self) -> None:
+        """记录本次发送时间"""
+        self._last_send_time = time.monotonic()
+```
+
+### 6.3 使用流程
+
+```
+用户发送 sendMessage
+       │
+       ▼
+  1. guard.check_rate_limit()
+       │── false → 返回 RATE_LIMITED 错误
+       ▼
+  2. guard.can_accept_message()
+       │── false → 返回 BUSY 错误（上一条还在处理）
+       ▼
+  3. guard.record_send_time()
+       │
+       ▼
+  4. async with guard.message_lock():
+       │   持久化用户消息
+       │   调用 Orchestrator 流式处理
+       │   推送 S2C 消息分片
+       │   持久化 Agent 回复
+       ▼
+  5. 锁自动释放，可接受下一条消息
+```
+
+### 6.4 错误响应
+
+| 场景 | 错误码 | recoverable | 说明 |
+|------|--------|-------------|------|
+| 发送过快 | `RATE_LIMITED` | true | 距上次发送不足 `min_interval_seconds` |
+| 上条处理中 | `BUSY` | true | `_lock` 被持有，上一条消息的 Agent 还在执行 |
+
+---
+
 ## 附录：状态流转检查清单
 
 | 检查项 | 状态 |
@@ -649,7 +792,12 @@ async def extend_lock_ttl(session_id: str, lock: SessionLock):
 | 群聊模式 DAG 状态机完整性 | ✅ 6 个核心节点 |
 | GraphState 结构定义 | ✅ Pydantic BaseModel |
 | 流式执行异常捕获 | ✅ 转换为 ErrorEntry |
+| Agent DB 状态流转 (offline→busy→online/error) | ✅ WebSocket 路由自动管理 |
+| WS 断开时 busy/error 重置为 online | ✅ finally 块清理 |
+| WebSocketSessionGuard 消息锁定 | ✅ asyncio.Lock 防止并发处理 |
+| WebSocketSessionGuard 频率限制 | ✅ min_interval 1s |
 | Redis 分布式锁实现 | ✅ SessionLock 上下文管理器 |
 | 锁超时自动释放 | ✅ TTL 5s |
 | 锁续期机制 | ✅ 每 2s 续期 |
 | 错误卡片 WebSocket 推送 | ✅ 符合 ws_messages.json 契约 |
+| S2C 类型化模型（7 种） | ✅ Pydantic v2 + camelCase alias |

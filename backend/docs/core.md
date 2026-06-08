@@ -8,6 +8,9 @@
 |------|------|
 | `config.py` | 全局配置管理 |
 | `database.py` | 数据库引擎与会话工厂 |
+| `auth.py` | JWT token 创建/验证、密码哈希 |
+| `redis.py` | Redis 客户端连接管理 |
+| `crypto.py` | Fernet 对称加密 (API Key 等敏感字段) |
 | `diff_engine.py` | 安全的代码 Diff/Patch 引擎 |
 | `exception_handler.py` | WebSocket 异常处理 |
 | `mcp_manager.py` | MCP 协议客户端管理器 |
@@ -32,11 +35,19 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = "postgres"
     DB_NAME: str = "agenthub"
 
-    # Redis (预留)
+    # Redis
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str = ""
     REDIS_DB: int = 0
+
+    # JWT 认证
+    SECRET_KEY: str = ""                 # JWT 签名密钥
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # 加密
+    ENCRYPTION_KEY: str = ""             # Fernet 密钥 (用于加密 API Key 等)
 
     # Anthropic
     ANTHROPIC_API_KEY: str = ""
@@ -104,6 +115,122 @@ async def list_items(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Item))
     return result.scalars().all()
 ```
+
+---
+
+## auth.py
+
+JWT token 创建/验证和密码哈希工具。
+
+### 密码哈希
+
+使用 `passlib` 的 bcrypt 方案。
+
+| 函数 | 说明 |
+|------|------|
+| `hash_password(password)` | 对明文密码进行 bcrypt 哈希 |
+| `verify_password(plain, hashed)` | 验证明文密码与哈希是否匹配 |
+
+### Token 创建
+
+| 函数 | 说明 |
+|------|------|
+| `encode_access_token(user_id, username, expires_delta?)` | 创建 JWT access token |
+| `encode_refresh_token(user_id)` | 创建 JWT refresh token |
+
+**Access Token payload**:
+```python
+{
+    "sub": str(user_id),    # 用户 ID
+    "username": str,         # 用户名
+    "iat": datetime,         # 签发时间
+    "exp": datetime,         # 过期时间 (默认 30 分钟)
+    "jti": str(uuid4),       # 唯一 token ID (用于黑名单)
+}
+```
+
+**Refresh Token payload**:
+```python
+{
+    "sub": str(user_id),
+    "type": "refresh",       # 标识为 refresh token
+    "iat": datetime,
+    "exp": datetime,         # 过期时间 (默认 7 天)
+    "jti": str(uuid4),
+}
+```
+
+### Token 验证
+
+| 函数 | 说明 |
+|------|------|
+| `decode_access_token(token)` | 解码并验证 JWT token，失败抛出 `jwt.PyJWTError` |
+
+使用 HS256 算法签名。验证签名和过期时间。
+
+### Token 黑名单
+
+登出时将 access token 的 `jti` 存入 Redis 黑名单（TTL = token 剩余有效期）。验证 token 时检查 `jti` 是否在黑名单中。
+
+---
+
+## redis.py
+
+异步 Redis 客户端管理，使用 `redis.asyncio`。
+
+### 核心函数
+
+| 函数 | 说明 |
+|------|------|
+| `get_redis_client()` | 返回共享的异步 Redis 客户端 (懒初始化，单例) |
+| `close_redis()` | 优雅关闭 Redis 连接池 |
+| `reset_redis()` | 重置客户端引用 (用于测试) |
+
+### 连接配置
+
+- URL: 从 `settings.REDIS_URL` 获取
+- 编码: UTF-8, 自动解码响应
+- 最大连接数: 20
+
+### 用途
+
+- JWT refresh token 存储 (`refresh:{user_id}`)
+- JWT access token 黑名单 (`bl:{jti}`)
+- 连接在首次调用 `get_redis_client()` 时懒初始化
+
+---
+
+## crypto.py
+
+Fernet 对称加密，用于敏感字段存储（如智能体的 API Key）。
+
+### 核心函数
+
+| 函数 | 说明 |
+|------|------|
+| `encrypt_field(plaintext)` | 加密明文字符串，返回密文 |
+| `decrypt_field(ciphertext)` | 解密密文字符串，返回明文 |
+
+### 工作原理
+
+1. 使用 `cryptography.fernet.Fernet` 对称加密
+2. 密钥从 `settings.ENCRYPTION_KEY` 获取
+3. 首次调用时懒初始化 Fernet 实例 (单例)
+4. 密钥为空时抛出 `RuntimeError`
+
+### 密钥生成
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+将生成的密钥设置为环境变量 `ENCRYPTION_KEY`。
+
+### 使用场景
+
+- 智能体创建时加密 `agent_config.api_key`
+- WebSocket 连接时解密 `api_key` 供适配器使用
+- 存储在数据库中的 API Key 始终为密文
 
 ---
 

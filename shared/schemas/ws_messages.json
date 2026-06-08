@@ -48,6 +48,11 @@
               "type": "string",
               "minLength": 1,
               "description": "User message content"
+            },
+            "replyToId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Optional ID of the message being replied to"
             }
           },
           "additionalProperties": false
@@ -188,7 +193,7 @@
             },
             "chunkType": {
               "type": "string",
-              "enum": ["text", "code_diff", "web_preview", "deploy_status"],
+              "enum": ["text", "code_diff", "web_preview", "deploy_status", "tool_status"],
               "description": "Content type for frontend rendering dispatch"
             },
             "deltaContent": {

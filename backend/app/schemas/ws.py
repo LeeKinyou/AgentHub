@@ -4,7 +4,8 @@ Wire format uses camelCase; internal models use snake_case with aliases.
 """
 from __future__ import annotations
 
-from typing import Union
+from datetime import datetime
+from typing import Literal, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -23,6 +24,7 @@ class SendMessagePayload(BaseModel):
 
     session_id: UUID
     content: str = Field(min_length=1)
+    reply_to_id: UUID | None = None
 
 
 class TriggerActionPayload(BaseModel):
@@ -57,6 +59,134 @@ class WSPing(BaseModel):
 
     type: str = "ping"
     timestamp: str = ""
+
+
+# ── S2C (server-to-client) payload models ──────────────────────────────
+
+
+class AgentStatusPayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    session_id: str
+    agent_id: str
+    status: Literal["analyzing", "executing", "completed", "failed", "online", "offline", "busy", "error"]
+    display_text: str
+
+
+class MessageChunkPayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    message_id: str
+    session_id: str
+    agent_id: str
+    chunk_type: Literal["text", "code_diff", "web_preview", "deploy_status", "tool_status"]
+    delta_content: str
+    chunk_index: int = Field(ge=0)
+    is_final: bool
+
+
+class MessageCompletePayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    id: str
+    session_id: str
+    sender_type: str
+    sender_id: str
+    content: str
+    content_type: str
+    card_data: dict | None = None
+    reply_to_id: str | None = None
+    is_pinned: bool = False
+    created_at: str
+
+
+class ErrorPayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    session_id: str
+    error_code: str
+    error_message: str
+    recoverable: bool
+
+
+class ActionStatusPayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    session_id: str
+    message_id: str
+    action_type: Literal["applyDiff", "retry", "pin"]
+    status: Literal["applying", "pending"]
+
+
+class ActionResultPayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    session_id: str
+    message_id: str
+    action_type: Literal["applyDiff", "retry", "pin"]
+    status: Literal["applied", "rejected", "failed"]
+    detail: str
+
+
+# ── S2C envelope models ────────────────────────────────────────────────
+
+
+class S2CPong(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    type: Literal["pong"] = "pong"
+    timestamp: str
+
+
+class S2CAgentStatus(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    type: Literal["agentStatus"] = "agentStatus"
+    timestamp: str
+    payload: AgentStatusPayload
+
+
+class S2CMessageChunk(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    type: Literal["messageChunk"] = "messageChunk"
+    timestamp: str
+    payload: MessageChunkPayload
+
+
+class S2CMessageComplete(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    type: Literal["messageComplete"] = "messageComplete"
+    timestamp: str
+    payload: MessageCompletePayload
+
+
+class S2CError(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    type: Literal["error"] = "error"
+    timestamp: str
+    payload: ErrorPayload
+
+
+class S2CActionStatus(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    type: Literal["actionStatus"] = "actionStatus"
+    timestamp: str
+    payload: ActionStatusPayload
+
+
+class S2CActionResult(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    type: Literal["actionResult"] = "actionResult"
+    timestamp: str
+    payload: ActionResultPayload
+
+
+S2CMessage = Union[S2CPong, S2CAgentStatus, S2CMessageChunk, S2CMessageComplete, S2CError, S2CActionStatus, S2CActionResult]
 
 
 # ── Type union for validation dispatch ──────────────────────────────────

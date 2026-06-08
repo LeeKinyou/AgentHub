@@ -1,7 +1,7 @@
 # AgentHub - 系统架构与通信规范
 
-> 文档版本：v1.0
-> 最后更新：2026-05-27
+> 文档版本：v1.1
+> 最后更新：2026-06-08
 > 架构约束：严格遵循 `.traerules` 硬性约束
 
 ---
@@ -64,6 +64,8 @@ AgentHub/
 │           └── ui/              # Shadcn UI 原子组件
 │
 └── backend/                     # 服务层
+    ├── alembic.ini              # Alembic 数据库迁移配置
+    ├── alembic/                 # 迁移脚本目录（async 支持）
     └── app/
         ├── agents/
         │   ├── base_adapter.py  # Agent 统一适配器抽象基类
@@ -72,8 +74,118 @@ AgentHub/
         │       ├── claude_code.py
         │       ├── codex.py
         │       └── opencode.py
+        ├── core/
+        │   ├── auth.py          # JWT + bcrypt 认证工具
+        │   ├── redis.py         # 异步 Redis 客户端
+        │   ├── database.py      # SQLAlchemy async session
+        │   ├── config.py        # 环境配置
+        │   └── exception_handler.py  # 全局异常拦截器
+        ├── models/              # SQLAlchemy ORM 模型
+        ├── schemas/             # Pydantic v2 请求/响应 Schema
+        │   └── ws.py            # WebSocket S2C/C2C 类型化模型
+        ├── routes/              # FastAPI 路由
+        │   ├── auth.py          # 认证路由 (register/login/refresh/logout)
+        │   ├── sessions.py      # 会话 CRUD
+        │   ├── messages.py      # 消息历史
+        │   ├── agents.py        # Agent 市场
+        │   └── websocket.py     # WebSocket 端点 + SessionGuard
         └── main.py              # FastAPI 入口
 ```
+
+### 1.4 契约优先开发流程 (Contract-First Workflow)
+
+> **硬性规则**：所有实体字段变更必须先改 `shared/schemas/`，再改后端/前端实现，严禁反向操作。
+
+```
+shared/schemas/entities.json  ──►  后端 SQLAlchemy 模型 + Pydantic Schema
+                      │
+                      └──►  前端 TypeScript 类型 (codegen 自动生成)
+```
+
+**开发步骤**：
+1. 在 `shared/schemas/entities.json` 中定义/修改实体字段
+2. 在 `shared/schemas/ws_messages.json` 中定义/修改 WebSocket 报文
+3. 运行 `scripts/codegen.js` 自动生成 TypeScript 类型
+4. 后端同步修改 SQLAlchemy 模型 + Pydantic Schema（camelCase alias 映射）
+5. 前端使用自动生成的类型，无需手写接口
+
+### 1.5 认证系统 (Authentication)
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   前端        │     │   FastAPI     │     │   Redis      │
+│              │     │              │     │              │
+│ POST /auth/  │────►│ bcrypt 验证   │     │              │
+│   login      │     │ JWT 签发     │     │              │
+│              │◄────│ 返回 token   │     │              │
+│              │     │              │     │              │
+│ 请求带       │────►│ JWT 解码     │────►│ bl:{jti}     │
+│ Authorization│     │ 黑名单检查   │     │ 黑名单检查   │
+│ Bearer token │     │              │     │              │
+│              │     │ POST /auth/  │────►│ SET bl:{jti} │
+│              │     │   logout     │     │ 加入黑名单   │
+└──────────────┘     └──────────────┘     └──────────────┘
+```
+
+**技术栈**：
+- **密码哈希**：bcrypt（passlib CryptContext）
+- **Token**：JWT (PyJWT)，HS256 签名，包含 `sub`（用户ID）、`jti`（唯一标识）、`exp`（过期时间）
+- **双 Token 机制**：Access Token（短期，30分钟）+ Refresh Token（长期，7天）
+- **Token 黑名单**：Redis `bl:{jti}` 键，TTL = 剩余有效期，logout 时写入
+- **Refresh Token 存储**：Redis `refresh:{user_id}` 键，登录/刷新时覆盖写入
+
+**认证端点**：
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/auth/register` | POST | 注册（bcrypt 哈希 + 返回双 token） |
+| `/auth/login` | POST | 登录（验证密码 + 返回双 token） |
+| `/auth/refresh` | POST | 刷新（验证 refresh token + Redis 比对） |
+| `/auth/logout` | POST | 登出（access token 加入 Redis 黑名单） |
+| `/auth/me` | GET | 获取当前用户信息 |
+
+### 1.6 数据库迁移 (Alembic)
+
+- 迁移框架：Alembic，支持 async SQLAlchemy
+- 配置文件：`backend/alembic.ini`，脚本目录 `backend/alembic/`
+- 迁移脚本通过 `env.py` 中的 async engine 执行
+- **当前状态**：Alembic 基础设施已就绪，初始迁移尚未生成
+
+### 1.7 Agent 状态生命周期 (Agent Status Lifecycle)
+
+`AgentProfile.status` 字段（VARCHAR(20)）追踪每个 Agent 的运行时状态：
+
+```
+┌──────────┐
+│ offline  │ ◄── Agent 初始/离线状态
+└────┬─────┘
+     │ 用户发送消息（sendMessage）
+     ▼
+┌──────────┐
+│   busy   │ ◄── Agent 正在处理任务
+└──┬───┬───┘
+   │   │
+   │   │ 执行失败
+   │   ▼
+   │ ┌──────────┐
+   │ │  error   │ ◄── Agent 执行异常
+   │ └──────────┘
+   │
+   │ 执行完成
+   ▼
+┌──────────┐
+│  online  │ ◄── Agent 就绪可用
+└──────────┘
+```
+
+**状态转换规则**：
+
+| 触发条件 | 原状态 | 新状态 | 代码位置 |
+|----------|--------|--------|----------|
+| 用户发送消息 | any | `busy` | `_handle_send_message` 中 `UPDATE agent_profiles SET status='busy'` |
+| Agent 执行完成 | `busy` | `online` | 收到 `completed` 事件时更新 |
+| Agent 执行失败 | `busy` | `error` | 收到 `failed` 事件或异常捕获时更新 |
+| WebSocket 断开连接 | `busy`/`error` | `online` | `finally` 块中重置，防止状态卡死 |
 
 ---
 
@@ -146,48 +258,33 @@ interface UserSendMessage {
 }
 ```
 
-##### 服务端 → 用户
+##### 服务端 → 用户（7 种 S2C 类型化模型）
 
-```typescript
-// Orchestrator 编排状态卡片
-interface OrchestratorStatusCard {
-  type: "orchestrator_status";
-  payload: {
-    session_id: string;
-    status: "thinking" | "planning" | "dispatching" | "aggregating";
-    plan?: {
-      steps: Array<{
-        order: number;
-        description: string;
-        assigned_agent: string;
-      }>;
-    };
-  };
-}
+所有 S2C 模型定义在 `backend/app/schemas/ws.py`，使用 Pydantic v2 + camelCase alias：
 
-// 子 Agent 流式打字机块
-interface AgentStreamChunk {
-  type: "agent_stream";
-  payload: {
-    session_id: string;
-    agent_id: string;
-    chunk_type: "text" | "code_diff" | "web_preview" | "deploy_status";
-    content: string;
-    is_final: boolean;
-  };
-}
+| 类型 (type) | 模型类 | 用途 |
+|-------------|--------|------|
+| `pong` | `S2CPong` | 心跳响应 |
+| `agentStatus` | `S2CAgentStatus` | Agent 状态变更通知（analyzing/executing/completed/failed） |
+| `messageChunk` | `S2CMessageChunk` | 流式消息分片（delta_content + chunk_index + is_final） |
+| `messageComplete` | `S2CMessageComplete` | 消息完成（完整 content + card_data） |
+| `error` | `S2CError` | 错误卡片（error_code + recoverable） |
+| `actionStatus` | `S2CActionStatus` | 动作执行状态（applying/pending） |
+| `actionResult` | `S2CActionResult` | 动作执行结果（applied/rejected/failed） |
 
-// 错误卡片 (异常捕获后推送)
-interface ErrorCard {
-  type: "error";
-  payload: {
-    session_id: string;
-    error_code: string;
-    error_message: string;
-    recoverable: boolean;
-    timestamp: string;
-  };
-}
+联合类型：`S2CMessage = Union[S2CPong, S2CAgentStatus, S2CMessageChunk, S2CMessageComplete, S2CError, S2CActionStatus, S2CActionResult]`
+
+```python
+# 示例：S2C 消息分片 payload
+class MessageChunkPayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+    message_id: str
+    session_id: str
+    agent_id: str
+    chunk_type: Literal["text", "code_diff", "web_preview", "deploy_status", "tool_status"]
+    delta_content: str
+    chunk_index: int = Field(ge=0)
+    is_final: bool
 ```
 
 ### 2.4 WebSocket 生命周期状态机
@@ -566,6 +663,11 @@ export function ErrorCard({ error_code, error_message, recoverable, onRetry }: E
 - [ ] `shared/` 是否零依赖？
 - [ ] `frontend/` 是否只依赖 `shared/`？
 - [ ] `backend/` 是否通过脚本同步 `shared/` 模型？
+- [ ] 实体字段变更是否先改 `shared/schemas/` 再改后端/前端？（契约优先）
 - [ ] 所有 Agent 适配器是否继承 `BaseAdapter`？
+- [ ] Agent 状态是否正确流转（offline → busy → online/error）？
+- [ ] WebSocket 断开时是否重置 busy/error Agent 为 online？
+- [ ] WebSocket S2C 消息是否使用类型化模型（`S2CMessage` union）？
+- [ ] 认证 token 是否检查 Redis 黑名单？
 - [ ] WebSocket 异常是否包装为 Error 卡片推送？
 - [ ] 是否存在静默死掉的异步操作？

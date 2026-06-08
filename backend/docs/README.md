@@ -167,9 +167,11 @@ pytest tests/ -v
 
 ## 子模块文档
 
-- [core/ - 核心基础设施](core.md)
-- [models/ - 数据库模型](models.md)
-- [schemas/ - 数据校验 Schema](schemas.md)
-- [routes/ - API 路由](routes.md)
-- [agents/ - 智能体适配层](agents.md)
-- [tests/ - 测试套件](tests.md)
+- [core/ - 核心基础设施](core.md) — 配置、数据库、认证、Redis、加密、Diff 引擎、MCP
+- [models/ - 数据库模型](models.md) — SQLAlchemy ORM 模型 & ER 图
+- [schemas/ - 数据校验 Schema](schemas.md) — Pydantic v2 请求/响应模型
+- [routes/ - API 路由](routes.md) — REST 端点 & WebSocket 处理
+- [agents/ - 智能体适配层](agents.md) — 适配器、编排器、LLM 集成
+- [websocket/ - WebSocket 协议](websocket.md) — 双向消息协议 & 生命周期
+- [migrations/ - 数据库迁移](migrations.md) — Alembic 迁移指南
+- [tests/ - 测试套件](tests.md) — 测试模块 & 运行方式

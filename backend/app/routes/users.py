@@ -30,7 +30,11 @@ async def list_users(
 
 
 @router.post("", response_model=ApiResponse[UserRead])
-async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
+async def create_user(
+    body: UserCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     user = User(
         username=body.username,
         email=body.email,
