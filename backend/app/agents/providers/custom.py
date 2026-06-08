@@ -58,13 +58,47 @@ class CustomAdapter(BaseAdapter):
             self.client = openai.AsyncOpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url or settings.OPENAI_BASE_URL,
+                timeout=120.0,
             )
         else:
-            self.client = anthropic.AsyncAnthropic(api_key=self.api_key)
+            self.client = anthropic.AsyncAnthropic(api_key=self.api_key, timeout=120.0)
 
     @property
     def system_prompt(self) -> str:
-        return self.agent_config.get("system_prompt", "You are a helpful assistant.")
+        base = self.agent_config.get("system_prompt") or "You are a helpful assistant."
+        file_ops_instruction = """
+
+## ⚠️ IMPORTANT: File Creation Protocol
+When the user asks you to create, modify, or delete files or projects, you MUST use @file_operation directives. Do NOT output file content as plain text or code blocks — the system will create the actual files on disk from these directives.
+
+### Creating a file:
+@file_operation {"action": "create", "path": "path/to/file.ext", "content": "full file content here"}
+
+### Modifying a file:
+@file_operation {"action": "modify", "path": "path/to/file.ext", "newContent": "full new file content"}
+
+### Deleting a file:
+@file_operation {"action": "delete", "path": "path/to/file.ext"}
+
+### Example — Creating a complete project with multiple files:
+When asked to create a web clock project, respond like this:
+
+我将为您创建一个网页时钟项目，包含以下文件：
+
+@file_operation {"action": "create", "path": "clock/index.html", "content": "<!DOCTYPE html>\n<html>\n<head><title>Clock</title></head>\n<body><div id=\"clock\"></div><script>setInterval(()=>{document.getElementById('clock').innerText=new Date().toLocaleTimeString()},1000)</script></body>\n</html>"}
+
+@file_operation {"action": "create", "path": "clock/style.css", "content": "body{display:flex;justify-content:center;align-items:center;height:100vh;font-family:monospace;font-size:4rem}"}
+
+All files have been created. You can open clock/index.html in a browser.
+
+### Rules:
+1. NEVER output file content as code blocks (```html, ```python, etc.) when creating files — use @file_operation only
+2. Use relative paths from the project root directory
+3. Include the COMPLETE file content in the content field — do not abbreviate or use placeholders
+4. You can include multiple @file_operation directives in one response
+5. Briefly explain what you're creating, then output the @file_operation directives, then confirm completion
+"""
+        return base + file_ops_instruction
 
     @property
     def tools(self) -> list[dict]:

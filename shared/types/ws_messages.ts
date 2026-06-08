@@ -17,6 +17,8 @@ export type AgentHubWebSocketMessages =
   | S2CMessageComplete
   | S2CError;
 
+export type WSMessage = AgentHubWebSocketMessages;
+
 export interface C2SPing {
   /**
    * Message type discriminator

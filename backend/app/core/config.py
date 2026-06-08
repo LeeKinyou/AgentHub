@@ -1,4 +1,5 @@
 import json
+import os
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, EnvSettingsSource
@@ -23,6 +24,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "AgentHub"
     API_V1_PREFIX: str = "/api"
 
+    # Database: "postgres" or "sqlite"
+    DATABASE_TYPE: str = "sqlite"
+
     # PostgreSQL
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
@@ -30,11 +34,15 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = "postgres"
     DB_NAME: str = "agenthub"
 
+    # SQLite
+    SQLITE_DB_PATH: str = "agenthub.db"
+
     # Redis
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str = ""
     REDIS_DB: int = 0
+    USE_REDIS: bool = False
 
     # Anthropic
     ANTHROPIC_API_KEY: str = ""
@@ -72,6 +80,9 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
+        if self.DATABASE_TYPE == "sqlite":
+            db_path = os.path.abspath(self.SQLITE_DB_PATH)
+            return f"sqlite+aiosqlite:///{db_path}"
         password = quote_plus(self.DB_PASSWORD)
         return f"postgresql+asyncpg://{self.DB_USER}:{password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 

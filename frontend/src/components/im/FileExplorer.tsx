@@ -10,6 +10,7 @@ interface FileExplorerProps {
   onOpenFile: (name: string, handle: FileSystemFileHandle) => void;
   onOpenFileTransient: (name: string, handle: FileSystemFileHandle) => void;
   onFileAction: (action: 'create' | 'delete' | 'copy', node: FileNode, fileName?: string) => void;
+  onReauthorize?: () => void;
 }
 
 function getFileIcon(name: string): string {
@@ -42,27 +43,34 @@ function FileTreeItem({ node, depth, activeFileName, onOpenFile, onOpenFileTrans
           style={{ paddingLeft: `${depth * 12 + 8}px` }}>
           <span className="text-[10px]">{isOpen ? '▼' : '▶'}</span><span>📂</span><span className="truncate">{node.name}</span>
         </button>
-        {isOpen && node.children?.map((c) => <FileTreeItem key={c.name} node={c} depth={depth + 1} activeFileName={activeFileName} onOpenFile={onOpenFile} onOpenFileTransient={onOpenFileTransient} onContextMenu={onContextMenu} />)}
+        {isOpen && (
+          node.children && node.children.length > 0
+            ? node.children.map((c) => <FileTreeItem key={c.name} node={c} depth={depth + 1} activeFileName={activeFileName} onOpenFile={onOpenFile} onOpenFileTransient={onOpenFileTransient} onContextMenu={onContextMenu} />)
+            : isOpen && depth < 2 && <span className="block text-[10px] text-zinc-600 dark:text-zinc-600 italic" style={{ paddingLeft: `${(depth + 1) * 12 + 20}px` }}>空文件夹</span>
+        )}
       </div>
     );
   }
 
   const isActive = node.name === activeFileName;
+  const hasHandle = !!node.fileHandle;
   const handleDragStart = (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', node.name); e.dataTransfer.effectAllowed = 'copy'; };
 
   return (
     <button draggable onDragStart={handleDragStart}
-      onClick={() => node.fileHandle && onOpenFileTransient(node.name, node.fileHandle)}
-      onDoubleClick={() => node.fileHandle && onOpenFile(node.name, node.fileHandle)}
+      onClick={() => hasHandle ? onOpenFileTransient(node.name, node.fileHandle!) : undefined}
+      onDoubleClick={() => hasHandle ? onOpenFile(node.name, node.fileHandle!) : undefined}
       onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, node); }}
-      className={`w-full flex items-center gap-1 px-2 py-1 text-xs transition-colors duration-150 cursor-grab active:cursor-grabbing ${isActive ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200'}`}
+      className={`w-full flex items-center gap-1 px-2 py-1 text-xs transition-colors duration-150 cursor-grab active:cursor-grabbing ${isActive ? 'bg-zinc-800 text-zinc-100' : hasHandle ? 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200' : 'text-zinc-600 dark:text-zinc-700 opacity-50 cursor-not-allowed'}`}
       style={{ paddingLeft: `${depth * 12 + 20}px` }}>
-      <span>{getFileIcon(node.name)}</span><span className="truncate">{node.name}</span>
+      <span>{getFileIcon(node.name)}</span>
+      <span className="truncate">{node.name}</span>
+      {!hasHandle && <span className="text-[9px] text-amber-500 ml-auto" title="需要重新授权">⚠</span>}
     </button>
   );
 }
 
-export function FileExplorer({ root, activeFileName, onOpenFile, onOpenFileTransient, onFileAction }: FileExplorerProps) {
+export function FileExplorer({ root, activeFileName, onOpenFile, onOpenFileTransient, onFileAction, onReauthorize }: FileExplorerProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [createTarget, setCreateTarget] = useState<FileNode | null>(null);
   const [newFileName, setNewFileName] = useState('untitled.txt');

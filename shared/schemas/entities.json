@@ -68,6 +68,26 @@
           },
           "description": "Array of participating agent IDs"
         },
+        "isPinned": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the session is pinned to top"
+        },
+        "isArchived": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the session is archived"
+        },
+        "lastActiveAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last activity timestamp for sorting"
+        },
+        "lastMessagePreview": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Preview of the last message"
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",

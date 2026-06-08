@@ -1,0 +1,23 @@
+﻿=== Step 1: Login ===
+Login: 200
+User: 019e974d-5440-74d3-9761-4bc4b0feb919
+
+=== Step 2: Create Agent ===
+Create Agent: 200
+Agent ID: 019e9756-d0b2-759b-9ea8-33e7be27883c
+
+=== Step 3: Create Session ===
+Create Session: 200
+Session ID: 019e9756-d8bc-7ad9-b4cd-435ec36b0166
+
+=== Step 4: WebSocket Chat ===
+Connecting to: ws://localhost:8001/ws?session_id=019e9756-d8bc-7ad9-b4cd-435ec36b0166&token=eyJ...
+WebSocket connected!
+Sent: 浣犲ソ锛岃绠€鍗曚粙缁嶄竴涓嬭嚜宸便€?
+  [agentStatus] agent= status= text=
+  [agentStatus] agent= status= text=
+  [messageChunk] {"type": "messageChunk", "timestamp": "2026-06-05T10:31:55.347665+00:00", "payload": {"messageId": "
+  [messageComplete] {"type": "messageComplete", "timestamp": "2026-06-05T10:31:55.404055+00:00", "payload": {"id": "019e
+  Timeout waiting for response
+
+=== No response received ===

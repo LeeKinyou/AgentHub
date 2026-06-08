@@ -6,8 +6,10 @@ interface AvatarStackProps {
 
 const AVATAR_MAP: Record<string, { label: string; bg: string; text: string }> = {
   'agent-orch-001': { label: '🎯', bg: 'bg-gradient-to-br from-violet-500 to-fuchsia-600', text: 'text-white' },
-  'agent-codex-001': { label: '🧠', bg: 'bg-gradient-to-br from-cyan-500 to-blue-600', text: 'text-white' },
-  'agent-claude-001': { label: '🔮', bg: 'bg-gradient-to-br from-amber-500 to-orange-600', text: 'text-white' },
+  'agent-mimo-001': { label: '🧠', bg: 'bg-gradient-to-br from-violet-500 to-purple-600', text: 'text-white' },
+  'agent-frontend-001': { label: '🎨', bg: 'bg-gradient-to-br from-cyan-500 to-blue-600', text: 'text-white' },
+  'agent-backend-001': { label: '⚙️', bg: 'bg-gradient-to-br from-amber-500 to-orange-600', text: 'text-white' },
+  'agent-orchestrator-001': { label: '🤖', bg: 'bg-gradient-to-br from-indigo-500 to-purple-600', text: 'text-white' },
 };
 
 const FALLBACK_AVATARS = [

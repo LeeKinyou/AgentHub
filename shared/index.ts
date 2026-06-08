@@ -8,5 +8,5 @@ export type {
   S2CMessageChunk,
   S2CMessageComplete,
   S2CError,
-  Message,
+  WSMessage,
 } from './types/ws_messages';
