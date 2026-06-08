@@ -12,6 +12,8 @@ def _to_camel(s: str) -> str:
 
 class AgentConfig(BaseModel):
     """Custom agent configuration."""
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     api_provider: str = "anthropic"  # anthropic | openai
     api_key: str = ""  # User-provided API key
     base_url: str = ""  # Custom base URL for OpenAI-compatible APIs
@@ -23,6 +25,8 @@ class AgentConfig(BaseModel):
 
 
 class AgentProfileBase(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     name: str = Field(..., min_length=1, max_length=100)
     avatar: str | None = None
     role: AgentRole
@@ -37,6 +41,8 @@ class AgentProfileCreate(AgentProfileBase):
 
 
 class AgentProfileUpdate(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     name: str | None = Field(None, min_length=1, max_length=100)
     avatar: str | None = None
     description: str | None = None

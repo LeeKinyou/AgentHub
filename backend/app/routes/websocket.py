@@ -18,7 +18,22 @@ from ..core.exception_handler import GlobalExceptionHandler, safe_error_message
 from ..models.agent_profile import AgentProfile
 from ..models.message import Message
 from ..models.session import Session
-from ..schemas.ws import validate_ws_message
+from ..schemas.ws import (
+    ActionStatusPayload,
+    ActionResultPayload,
+    AgentStatusPayload,
+    ErrorPayload,
+    MessageChunkPayload,
+    MessageCompletePayload,
+    S2CActionResult,
+    S2CActionStatus,
+    S2CAgentStatus,
+    S2CError,
+    S2CMessageChunk,
+    S2CMessageComplete,
+    S2CPong,
+    validate_ws_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,16 +105,15 @@ async def build_conversation_history(
 
 
 def _error_payload(session_id: str, code: str, message: str, recoverable: bool = False) -> dict:
-    return {
-        "type": "error",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "payload": {
-            "sessionId": session_id,
-            "errorCode": code,
-            "errorMessage": message,
-            "recoverable": recoverable,
-        },
-    }
+    return S2CError(
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        payload=ErrorPayload(
+            session_id=session_id,
+            error_code=code,
+            error_message=message,
+            recoverable=recoverable,
+        ),
+    ).model_dump(mode="json", by_alias=True)
 
 
 async def _handle_send_message(
@@ -123,6 +137,22 @@ async def _handle_send_message(
         return
 
     content = payload.get("content", "")
+    raw_reply_to_id = payload.get("replyToId")
+    reply_to_id = None
+    if raw_reply_to_id:
+        try:
+            candidate = uuid.UUID(raw_reply_to_id)
+            # Validate the referenced message exists in this session
+            ref_result = await db.execute(
+                select(Message.id).where(
+                    Message.id == candidate,
+                    Message.session_id == session_uuid,
+                )
+            )
+            if ref_result.scalar_one_or_none() is not None:
+                reply_to_id = candidate
+        except (ValueError, TypeError):
+            pass
     guard.record_send_time()
 
     async with guard.message_lock():
@@ -134,12 +164,14 @@ async def _handle_send_message(
             sender_id="user",
             content=content,
             content_type="text",
+            reply_to_id=reply_to_id,
         )
         db.add(user_msg)
+        preview = content[:200] if content else ""
         await db.execute(
             update(Session)
             .where(Session.id == session_uuid)
-            .values(updated_at=datetime.now(timezone.utc))
+            .values(updated_at=datetime.now(timezone.utc), last_active_at=datetime.now(timezone.utc), last_message_preview=preview)
         )
         await db.commit()
 
@@ -150,36 +182,66 @@ async def _handle_send_message(
             db, session_uuid, limit=20, exclude_id=user_msg.id
         )
 
+        # Mark participating agents as busy
+        agent_uuids = [uuid.UUID(a.agent_id) for a in agent_roster if a.agent_id]
+        if agent_uuids:
+            await db.execute(
+                update(AgentProfile)
+                .where(AgentProfile.id.in_(agent_uuids))
+                .values(status="busy")
+            )
+            await db.commit()
+
         try:
             async for event in orchestrator.process(session_id, content, agent_roster, conversation_history=conversation_history):
                 if isinstance(event, AgentStatusEvent):
-                    await websocket.send_json({
-                        "type": "agentStatus",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "payload": {
-                            "sessionId": session_id,
-                            "agentId": event.agent_id,
-                            "status": event.status,
-                            "displayText": event.display_text,
-                        },
-                    })
+                    # Update agent status in DB on terminal states
+                    if event.status in ("completed", "failed"):
+                        try:
+                            agent_uuid = uuid.UUID(event.agent_id)
+                            new_status = "online" if event.status == "completed" else "error"
+                            await db.execute(
+                                update(AgentProfile)
+                                .where(AgentProfile.id == agent_uuid)
+                                .values(status=new_status)
+                            )
+                            await db.commit()
+                        except (ValueError, TypeError):
+                            pass
+
+                    await websocket.send_json(S2CAgentStatus(
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        payload=AgentStatusPayload(
+                            session_id=session_id,
+                            agent_id=event.agent_id,
+                            status=event.status,
+                            display_text=event.display_text,
+                        ),
+                    ).model_dump(mode="json", by_alias=True))
                 elif isinstance(event, MessageChunk):
                     full_content += event.content
                     chunk_index = getattr(event, "chunk_index", 0)
-                    await websocket.send_json({
-                        "type": "messageChunk",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "payload": {
-                            "messageId": response_message_id,
-                            "sessionId": session_id,
-                            "agentId": event.agent_id or primary_agent_id,
-                            "chunkType": event.chunk_type,
-                            "deltaContent": event.content,
-                            "chunkIndex": chunk_index,
-                            "isFinal": event.is_final,
-                        },
-                    })
+                    await websocket.send_json(S2CMessageChunk(
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        payload=MessageChunkPayload(
+                            message_id=response_message_id,
+                            session_id=session_id,
+                            agent_id=event.agent_id or primary_agent_id,
+                            chunk_type=event.chunk_type,
+                            delta_content=event.content,
+                            chunk_index=chunk_index,
+                            is_final=event.is_final,
+                        ),
+                    ).model_dump(mode="json", by_alias=True))
         except Exception as exc:
+            # Mark agents as error on orchestrator failure
+            if agent_uuids:
+                await db.execute(
+                    update(AgentProfile)
+                    .where(AgentProfile.id.in_(agent_uuids))
+                    .values(status="error")
+                )
+                await db.commit()
             logger.exception("Orchestrator failed for session %s: %s", session_id, exc)
             error_code = GlobalExceptionHandler._classify_error(exc)
             await websocket.send_json(_error_payload(
@@ -199,28 +261,30 @@ async def _handle_send_message(
             content_type="text",
         )
         db.add(agent_msg)
+        agent_preview = full_content[:200] if full_content else ""
         await db.execute(
             update(Session)
             .where(Session.id == session_uuid)
-            .values(updated_at=datetime.now(timezone.utc))
+            .values(updated_at=datetime.now(timezone.utc), last_active_at=datetime.now(timezone.utc), last_message_preview=agent_preview)
         )
         await db.commit()
         await db.refresh(agent_msg)
 
-        await websocket.send_json({
-            "type": "messageComplete",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "payload": {
-                "id": str(agent_msg.id),
-                "sessionId": session_id,
-                "senderType": "agent",
-                "senderId": agent_msg.sender_id,
-                "content": full_content,
-                "contentType": "text",
-                "cardData": agent_msg.card_data,
-                "createdAt": agent_msg.created_at.isoformat() if agent_msg.created_at else datetime.now(timezone.utc).isoformat(),
-            },
-        })
+        await websocket.send_json(S2CMessageComplete(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            payload=MessageCompletePayload(
+                id=str(agent_msg.id),
+                session_id=session_id,
+                sender_type="agent",
+                sender_id=agent_msg.sender_id,
+                content=full_content,
+                content_type="text",
+                card_data=agent_msg.card_data,
+                reply_to_id=None,
+                is_pinned=False,
+                created_at=agent_msg.created_at.isoformat() if agent_msg.created_at else datetime.now(timezone.utc).isoformat(),
+            ),
+        ).model_dump(mode="json", by_alias=True))
 
 
 async def _handle_trigger_action(
@@ -271,16 +335,15 @@ async def _handle_trigger_action(
         await websocket.send_json(_error_payload(session_id, "INVALID_DIFF", "diffBlock missing filename or hunks"))
         return
 
-    await websocket.send_json({
-        "type": "actionStatus",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "payload": {
-            "sessionId": session_id,
-            "messageId": message_id_str,
-            "actionType": "applyDiff",
-            "status": "applying",
-        },
-    })
+    await websocket.send_json(S2CActionStatus(
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        payload=ActionStatusPayload(
+            session_id=session_id,
+            message_id=message_id_str,
+            action_type="applyDiff",
+            status="applying",
+        ),
+    ).model_dump(mode="json", by_alias=True))
 
     success, detail = await apply_diff_to_file(filename, hunks)
 
@@ -291,17 +354,16 @@ async def _handle_trigger_action(
 
     logger.info("applyDiff %s for message %s: %s", new_status, message_id_str, detail)
 
-    await websocket.send_json({
-        "type": "actionResult",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "payload": {
-            "sessionId": session_id,
-            "messageId": message_id_str,
-            "actionType": "applyDiff",
-            "status": new_status,
-            "detail": detail,
-        },
-    })
+    await websocket.send_json(S2CActionResult(
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        payload=ActionResultPayload(
+            session_id=session_id,
+            message_id=message_id_str,
+            action_type="applyDiff",
+            status=new_status,
+            detail=detail,
+        ),
+    ).model_dump(mode="json", by_alias=True))
 
 
 @router.websocket("/ws")
@@ -417,7 +479,7 @@ async def websocket_endpoint(
                 msg_type = data.get("type")
 
                 if msg_type == "ping":
-                    await websocket.send_json({"type": "pong", "timestamp": data.get("timestamp")})
+                    await websocket.send_json(S2CPong(timestamp=data.get("timestamp", "")).model_dump(mode="json", by_alias=True))
 
                 elif msg_type == "sendMessage":
                     await _handle_send_message(
@@ -447,3 +509,15 @@ async def websocket_endpoint(
             await websocket.close()
         finally:
             await orchestrator.cleanup()
+            # Reset agent status on disconnect to prevent stuck "busy" state
+            agent_uuids = [uuid.UUID(a.agent_id) for a in agent_roster if a.agent_id]
+            if agent_uuids:
+                try:
+                    await db.execute(
+                        update(AgentProfile)
+                        .where(AgentProfile.id.in_(agent_uuids), AgentProfile.status.in_(["busy", "error"]))
+                        .values(status="online")
+                    )
+                    await db.commit()
+                except Exception:
+                    pass

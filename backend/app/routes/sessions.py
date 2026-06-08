@@ -84,6 +84,10 @@ async def update_session(
         return ApiResponse(code=404, message="Session not found")
     if body.title is not None:
         session.title = body.title
+    if body.is_pinned is not None:
+        session.is_pinned = body.is_pinned
+    if body.is_archived is not None:
+        session.is_archived = body.is_archived
     await db.flush()
     await db.refresh(session)
     return ApiResponse(data=SessionRead.model_validate(session))

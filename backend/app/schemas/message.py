@@ -85,10 +85,14 @@ class MessageRead(BaseModel):
     content: str
     content_type: str
     card_data: dict | None = None
+    reply_to_id: UUID | None = None
+    is_pinned: bool = False
     created_at: datetime
 
 
 class MessageCreate(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
     content: str
     content_type: str = "text"
     card_data: dict | None = None
