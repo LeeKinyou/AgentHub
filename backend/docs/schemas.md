@@ -2,6 +2,8 @@
 
 Pydantic v2 模型定义，用于请求体校验、响应序列化和 WebSocket 消息规范。
 
+> **camelCase 别名**: 所有 Schema 均使用 `ConfigDict(alias_generator=_to_camel, populate_by_name=True)` 配置。线上 JSON 传输统一用 camelCase（如 `sessionId`、`agentId`），Python 内部用 snake_case。`populate_by_name=True` 允许同时接受两种命名。
+
 ## 模块列表
 
 | 文件 | 职责 |
@@ -157,6 +159,8 @@ ApiResponse(code=404, message="User not found")
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `title` | str \| None | 会话标题 |
+| `is_pinned` | bool \| None | 是否置顶 |
+| `is_archived` | bool \| None | 是否归档 |
 
 ### SessionRead
 
@@ -169,6 +173,10 @@ ApiResponse(code=404, message="User not found")
 | `title` | str | 标题 |
 | `type` | str | 类型 |
 | `agent_ids` | list[UUID] | 智能体 ID 列表 |
+| `is_pinned` | bool | 是否置顶 (默认 False) |
+| `is_archived` | bool | 是否归档 (默认 False) |
+| `last_active_at` | datetime \| None | 最后活跃时间 |
+| `last_message_preview` | str \| None | 最新消息预览 |
 | `created_at` | datetime | 创建时间 |
 | `updated_at` | datetime | 更新时间 |
 
@@ -249,6 +257,21 @@ class CardData(BaseModel):
 
 消息响应体和创建请求体。
 
+#### MessageRead
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | UUID | 消息 ID |
+| `session_id` | UUID | 所属会话 |
+| `sender_type` | str | 发送者类型 |
+| `sender_id` | str | 发送者 ID |
+| `content` | str | 消息内容 |
+| `content_type` | str | 内容类型 |
+| `card_data` | dict \| None | 富内容卡片数据 |
+| `reply_to_id` | UUID \| None | 回复目标消息 ID |
+| `is_pinned` | bool | 是否置顶 (默认 False) |
+| `created_at` | datetime | 创建时间 |
+
 ---
 
 ## ws.py
@@ -262,8 +285,16 @@ WebSocket 消息协议 Schema。
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `type` | str | `"sendMessage"` |
+| `timestamp` | str | ISO 时间戳 |
+| `payload` | SendMessagePayload | 消息体 |
+
+##### SendMessagePayload
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
 | `session_id` | UUID | 会话 ID |
 | `content` | str | 消息内容 |
+| `reply_to_id` | UUID \| None | 回复目标消息 ID (可选) |
 
 #### WSTriggerAction
 
@@ -294,7 +325,7 @@ WebSocket 消息协议 Schema。
 | `message_id` | str | 消息 ID |
 | `session_id` | UUID | 会话 ID |
 | `agent_id` | str | 智能体 ID |
-| `chunk_type` | str | 块类型: `text` / `code_diff` / `web_preview` / `deploy_status` |
+| `chunk_type` | str | 块类型: `text` / `code_diff` / `web_preview` / `deploy_status` / `tool_status` |
 | `delta_content` | str | 增量内容 |
 | `chunk_index` | int | 块序号 |
 | `is_final` | bool | 是否最后一块 |
@@ -308,3 +339,40 @@ WebSocket 消息协议 Schema。
 | `error_code` | str | 错误码 |
 | `error_message` | str | 错误消息 |
 | `recoverable` | bool | 是否可恢复 |
+
+### S2C 类型化 Payload 模型
+
+服务端推送的每种消息类型都有独立的 Payload 模型和信封 (envelope) 模型，均使用 camelCase 别名。
+
+#### Payload 模型
+
+| 模型 | 用途 | 关键字段 |
+|------|------|----------|
+| `AgentStatusPayload` | 智能体状态变更 | `session_id`, `agent_id`, `status`, `display_text` |
+| `MessageChunkPayload` | 流式消息块 | `message_id`, `session_id`, `agent_id`, `chunk_type`, `delta_content`, `chunk_index`, `is_final` |
+| `MessageCompletePayload` | 消息完成 | `id`, `session_id`, `sender_type`, `sender_id`, `content`, `content_type`, `card_data`, `reply_to_id`, `is_pinned`, `created_at` |
+| `ErrorPayload` | 错误通知 | `session_id`, `error_code`, `error_message`, `recoverable` |
+| `ActionStatusPayload` | 操作状态 | `session_id`, `message_id`, `action_type`, `status` |
+| `ActionResultPayload` | 操作结果 | `session_id`, `message_id`, `action_type`, `status`, `detail` |
+
+#### 信封模型
+
+每个 Payload 都有对应的信封包装：`S2CAgentStatus`, `S2CMessageChunk`, `S2CMessageComplete`, `S2CError`, `S2CActionStatus`, `S2CActionResult`，加上 `S2CPong` 共 7 个 S2C 信封类型。
+
+联合类型: `S2CMessage = Union[S2CPong, S2CAgentStatus, S2CMessageChunk, S2CMessageComplete, S2CError, S2CActionStatus, S2CActionResult]`
+
+#### AgentStatusPayload.status 枚举
+
+`analyzing` | `executing` | `completed` | `failed` | `online` | `offline` | `busy` | `error`
+
+#### MessageChunkPayload.chunk_type 枚举
+
+`text` | `code_diff` | `web_preview` | `deploy_status` | `tool_status`
+
+#### ActionStatusPayload.status 枚举
+
+`applying` | `pending`
+
+#### ActionResultPayload.status 枚举
+
+`applied` | `rejected` | `failed`

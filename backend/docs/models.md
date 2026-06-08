@@ -10,12 +10,12 @@ SQLAlchemy ORM 模型定义，使用 PostgreSQL 特有类型 (UUID, JSONB, ARRAY
 ┌──────────┐     1:N     ┌───────────────┐     1:N     ┌──────────┐
 │   User   │────────────▶│    Session    │────────────▶│  Message │
 └──────────┘             └───────────────┘             └──────────┘
-     │                         │
-     │ 1:N                     │ N:M (via agent_ids)
-     ▼                         │
-┌───────────────┐              │
-│ AgentProfile  │◀─────────────┘
-└───────────────┘
+     │                         │                          │    ▲
+     │ 1:N                     │ N:M (via agent_ids)      │    │
+     ▼                         │                          │ 1:N│
+┌───────────────┐              │                          │(self-ref
+│ AgentProfile  │◀─────────────┘                          │ FK) │
+└───────────────┘                                         └────┘
 ```
 
 ---
@@ -29,8 +29,10 @@ SQLAlchemy ORM 模型定义，使用 PostgreSQL 特有类型 (UUID, JSONB, ARRAY
 | `id` | UUID | PK, default=uuid7 | 用户唯一标识 |
 | `username` | String(100) | UNIQUE, NOT NULL | 用户名 |
 | `email` | String(255) | UNIQUE, NULLABLE | 邮箱 |
+| `password_hash` | String(128) | NOT NULL | 密码哈希 (bcrypt) |
 | `avatar` | String(512) | NULLABLE | 头像 URL |
 | `created_at` | DateTime(tz) | server_default=now() | 创建时间 |
+| `updated_at` | DateTime(tz) | server_default=now(), onupdate=now() | 更新时间 |
 
 ### 表名: `users`
 
@@ -38,10 +40,12 @@ SQLAlchemy ORM 模型定义，使用 PostgreSQL 特有类型 (UUID, JSONB, ARRAY
 class User(Base):
     __tablename__ = "users"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
-    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     avatar: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 ```
 
 ---
@@ -106,6 +110,10 @@ class User(Base):
 | `title` | String(255) | NOT NULL, default="新对话" | 会话标题 |
 | `type` | String(10) | NOT NULL | 类型: `single` / `group` |
 | `agent_ids` | ARRAY(UUID) | NOT NULL, default=[] | 参与的智能体 ID 列表 |
+| `is_pinned` | Boolean | NOT NULL, default=False | 是否置顶 |
+| `is_archived` | Boolean | NOT NULL, default=False | 是否归档 |
+| `last_active_at` | DateTime(tz) | NULLABLE | 最后活跃时间 (消息收发时自动更新) |
+| `last_message_preview` | String(200) | NULLABLE | 最新消息预览 (截取前 200 字符) |
 | `created_at` | DateTime(tz) | server_default=now() | 创建时间 |
 | `updated_at` | DateTime(tz) | server_default=now(), onupdate=now() | 更新时间 |
 
@@ -115,6 +123,9 @@ class User(Base):
 
 - `agent_ids` 使用 PostgreSQL `ARRAY` 类型，存储参与会话的智能体 UUID 列表
 - `type` 区分单智能体 (`single`) 和多智能体协作 (`group`) 会话
+- `is_pinned` 用于会话置顶功能
+- `is_archived` 用于会话归档（软隐藏）
+- `last_active_at` 和 `last_message_preview` 在每次消息收发时自动更新，用于会话列表展示
 - `updated_at` 在每次更新时自动刷新
 - 删除用户时级联删除其所有会话
 
@@ -133,9 +144,17 @@ class User(Base):
 | `content` | Text | NOT NULL, default="" | 消息文本内容 |
 | `content_type` | String(20) | NOT NULL, default="text" | 内容类型 |
 | `card_data` | JSONB | NULLABLE | 富内容卡片数据 |
+| `reply_to_id` | UUID | FK(messages.id), SET NULL, NULLABLE | 回复目标消息 ID (自引用) |
+| `is_pinned` | Boolean | NOT NULL, default=False | 是否置顶 |
 | `created_at` | DateTime(tz) | server_default=now() | 创建时间 |
 
 ### 表名: `messages`
+
+### 关键设计
+
+- `reply_to_id` 是自引用外键，指向同表的 `messages.id`，删除被引用消息时置为 NULL (`SET NULL`)
+- `is_pinned` 用于消息置顶功能
+- 删除会话时级联删除其所有消息
 
 ### content_type 枚举
 
