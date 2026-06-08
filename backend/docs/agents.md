@@ -111,14 +111,14 @@ ADAPTER_REGISTRY: dict[str, Type[BaseAdapter]] = {
 
 ### get_adapter()
 
-工厂函数，根据类型创建适配器实例。
+工厂函数，根据类型创建适配器实例。`codex`、`opencode`、`custom` 三种适配器接收 `agent_config` 参数。
 
 ```python
 def get_adapter(adapter_type: str, agent_config: dict | None = None) -> BaseAdapter:
     if adapter_type not in ADAPTER_REGISTRY:
         raise ValueError(f"Unknown adapter type: {adapter_type}")
-    if adapter_type == "custom":
-        return CustomAdapter(agent_config=agent_config)
+    if adapter_type in ("codex", "opencode", "custom"):
+        return ADAPTER_REGISTRY[adapter_type](agent_config=agent_config)
     return ADAPTER_REGISTRY[adapter_type]()
 ```
 
@@ -126,7 +126,7 @@ def get_adapter(adapter_type: str, agent_config: dict | None = None) -> BaseAdap
 
 ## orchestrator.py
 
-多智能体编排器，使用 LLM 进行意图分析和任务分解。
+多智能体编排器，使用 LLM 进行意图分析和任务分解。支持 Anthropic 和 OpenAI 双 API 规划。
 
 ### 核心流程
 
@@ -142,7 +142,7 @@ def get_adapter(adapter_type: str, agent_config: dict | None = None) -> BaseAdap
         ▼
 ┌───────────────────┐
 │ 2. LLM 规划        │──失败──▶ 降级为单智能体 (第一个)
-│    (Claude)        │
+│ (Anthropic/OpenAI) │
 └───────┬───────────┘
         │成功
         ▼
@@ -153,7 +153,8 @@ def get_adapter(adapter_type: str, agent_config: dict | None = None) -> BaseAdap
         │否
         ▼
 ┌───────────────────┐
-│ 4. 顺序执行        │
+│ 4. 拓扑排序分组     │
+│    并行执行         │
 │    上下文传递       │
 └───────────────────┘
 ```
@@ -184,8 +185,9 @@ class AgentDescriptor:
 ```python
 @dataclass
 class PlanStep:
-    agent_id: str  # 目标智能体 ID
-    task: str      # 子任务描述
+    agent_id: str                       # 目标智能体 ID
+    task: str                           # 子任务描述
+    depends_on: list[int] = field(default_factory=list)  # 依赖的步骤索引列表
 ```
 
 ### Orchestrator 类
@@ -196,7 +198,7 @@ class PlanStep:
 
 #### `_plan_execution(user_content, agent_roster)`
 
-调用 LLM (Claude) 分析用户意图，生成执行计划。
+调用 LLM 分析用户意图，生成执行计划。根据 `api_provider` 自动选择 Anthropic (`_plan_with_anthropic`) 或 OpenAI (`_plan_with_openai`)。
 
 规划提示词要求 LLM 返回 JSON 数组:
 ```json
@@ -208,9 +210,9 @@ class PlanStep:
 
 #### `_resolve_planner_credentials(agent_roster)`
 
-选择规划用 LLM 的凭证:
-1. 优先使用 `role="orchestrator"` 的智能体配置中的 `model` 和 `api_key`
-2. 回退到全局 Settings 的 `ANTHROPIC_MODEL` 和 `ANTHROPIC_API_KEY`
+选择规划用 LLM 的凭证，返回 `(model, api_key, api_provider, base_url)`:
+1. 优先使用 `role="orchestrator"` 的智能体配置中的 `model`、`api_key`、`api_provider`
+2. 回退到全局 Settings 的 `ANTHROPIC_MODEL` 和 `ANTHROPIC_API_KEY`（默认 Anthropic）
 
 #### `_delegate_single(agent, user_content, session_id, conversation_history=None)`
 
@@ -218,11 +220,12 @@ class PlanStep:
 
 #### `_execute_plan(steps, agent_roster, session_id, conversation_history=None)`
 
-多步顺序执行，每步:
-1. 发送 `analyzing` 状态
-2. 构建上下文感知的任务提示 (包含前序输出)
-3. 流式转发智能体输出
-4. 累积输出供后续步骤使用
+多步并行执行。步骤通过 `group_steps_into_levels()` 按依赖关系进行拓扑排序分组:
+1. 同一层级内的步骤无互相依赖，通过 `asyncio.gather()` 并行执行
+2. 每步发送 `analyzing` → `executing` 状态
+3. 构建上下文感知的任务提示 (包含前序输出)
+4. 流式转发智能体输出
+5. 累积输出供后续步骤使用
 
 #### `_build_step_prompt(task, step_idx, steps, accumulated_outputs, accumulated_names)`
 

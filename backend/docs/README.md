@@ -24,6 +24,9 @@ backend/
 │   ├── core/                # 核心基础设施
 │   │   ├── config.py        # 配置管理 (Pydantic Settings)
 │   │   ├── database.py      # 数据库引擎与会话
+│   │   ├── auth.py          # JWT 认证与令牌管理
+│   │   ├── redis.py         # Redis 连接与令牌黑名单
+│   │   ├── crypto.py        # 字段加密/解密 (API Key 等)
 │   │   ├── diff_engine.py   # 安全 Diff/Patch 引擎
 │   │   ├── exception_handler.py  # WebSocket 异常处理
 │   │   └── mcp_manager.py   # MCP 客户端管理器
@@ -31,19 +34,24 @@ backend/
 │   │   ├── user.py          # 用户模型
 │   │   ├── agent_profile.py # 智能体配置模型
 │   │   ├── session.py       # 会话模型
-│   │   └── message.py       # 消息模型
+│   │   ├── session_agent.py # 会话-智能体关联表
+│   │   ├── message.py       # 消息模型
+│   │   └── types.py         # 自定义类型 (GUID, GUIDArray)
 │   ├── schemas/             # Pydantic 数据校验
 │   │   ├── common.py        # 通用响应封装
 │   │   ├── user.py          # 用户 CRUD Schema
+│   │   ├── auth.py          # 认证 Schema (LoginRequest, TokenResponse)
 │   │   ├── agent.py         # 智能体 Schema
 │   │   ├── session.py       # 会话 Schema
 │   │   ├── message.py       # 消息 + 卡片数据 Schema
 │   │   └── ws.py            # WebSocket 消息 Schema
 │   ├── routes/              # API 路由
+│   │   ├── auth.py          # /api/auth (注册、登录、刷新、登出)
 │   │   ├── users.py         # /api/users
 │   │   ├── sessions.py      # /api/users/{id}/sessions
 │   │   ├── agents.py        # /api/agents
 │   │   ├── messages.py      # /api/sessions/{id}/messages
+│   │   ├── deploy.py        # /api/deploy (部署相关)
 │   │   └── websocket.py     # /ws (WebSocket)
 │   └── agents/              # 智能体适配层
 │       ├── base_adapter.py  # 适配器抽象基类
@@ -126,6 +134,11 @@ pytest tests/ -v
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/health` | 健康检查 |
+| POST | `/api/auth/register` | 用户注册 |
+| POST | `/api/auth/login` | 用户登录 (返回 JWT) |
+| POST | `/api/auth/refresh` | 刷新令牌 |
+| POST | `/api/auth/logout` | 登出 (令牌加入黑名单) |
+| GET | `/api/auth/me` | 当前用户信息 |
 | GET/POST | `/api/users` | 用户列表 / 创建 |
 | GET/PATCH/DELETE | `/api/users/{id}` | 用户详情 / 更新 / 删除 |
 | GET/POST | `/api/users/{id}/sessions` | 会话列表 / 创建 |
@@ -133,7 +146,7 @@ pytest tests/ -v
 | GET/POST | `/api/agents` | 智能体列表 / 创建 |
 | GET/PATCH/DELETE | `/api/agents/{id}` | 智能体操作 |
 | GET | `/api/sessions/{id}/messages` | 消息列表 (游标分页) |
-| WS | `/ws?session_id={id}` | 实时通信 |
+| WS | `/ws?session_id={id}&token={jwt}` | 实时通信 |
 
 ## WebSocket 协议
 
@@ -172,6 +185,7 @@ pytest tests/ -v
 - [schemas/ - 数据校验 Schema](schemas.md) — Pydantic v2 请求/响应模型
 - [routes/ - API 路由](routes.md) — REST 端点 & WebSocket 处理
 - [agents/ - 智能体适配层](agents.md) — 适配器、编排器、LLM 集成
+- [data-flow/ - 全流程数据流](data-flow.md) — 用户消息 → 编排 → Agent 执行 → 响应的端到端数据流
 - [websocket/ - WebSocket 协议](websocket.md) — 双向消息协议 & 生命周期
 - [migrations/ - 数据库迁移](migrations.md) — Alembic 迁移指南
 - [tests/ - 测试套件](tests.md) — 测试模块 & 运行方式

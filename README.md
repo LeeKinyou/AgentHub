@@ -35,7 +35,7 @@ AgentHub/
 | 认证       | JWT, bcrypt                                        |
 | LLM SDK  | Anthropic, OpenAI（兼容本地模型）                          |
 | Agent 协议 | MCP (Model Context Protocol)                       |
-| Agent 编排 | LangGraph                                          |
+| Agent 编排 | 自研 Orchestrator (LLM 规划 + 拓扑排序并行执行)       |
 | 包管理      | pnpm（前端/shared），uv（后端）                             |
 
 ## 环境要求
@@ -119,15 +119,15 @@ pnpm codegen
 
 所有后端接口统一前缀 `/api`：
 
-| 路径               | 说明             |
-| ---------------- | -------------- |
-| `/api/auth`      | 认证接口（注册、登录）    |
-| `/api/users`     | 用户管理           |
-| `/api/sessions`  | 聊天会话（创建、列表）    |
-| `/api/agents`    | Agent 配置 & 注册  |
-| `/api/messages`  | 消息增删改查         |
-| `/api/websocket` | WebSocket 实时通信 |
-| `/health`        | 健康检查           |
+| 路径                                | 说明                    |
+| ---------------------------------- | --------------------- |
+| `/api/auth`                        | 认证接口（注册、登录、刷新、登出） |
+| `/api/users`                       | 用户管理                |
+| `/api/users/{id}/sessions`         | 聊天会话（创建、列表）         |
+| `/api/agents`                      | Agent 配置 & 注册       |
+| `/api/sessions/{id}/messages`      | 消息增删改查              |
+| `/ws?session_id={id}&token={jwt}`  | WebSocket 实时通信      |
+| `/health`                          | 健康检查                |
 
 ## Agent 适配器
 

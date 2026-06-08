@@ -280,6 +280,8 @@ WebSocket 消息协议 Schema。
 
 ### 客户端 -> 服务端
 
+> **注意**: 以下表格使用 Python snake_case 属性名。线上 JSON 传输使用 camelCase（如 `session_id` → `sessionId`、`reply_to_id` → `replyToId`），由 Pydantic `alias_generator=_to_camel` 自动转换。
+
 #### WSSendMessage
 
 | 字段 | 类型 | 说明 |
@@ -290,11 +292,11 @@ WebSocket 消息协议 Schema。
 
 ##### SendMessagePayload
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `session_id` | UUID | 会话 ID |
-| `content` | str | 消息内容 |
-| `reply_to_id` | UUID \| None | 回复目标消息 ID (可选) |
+| 字段 | 类型 | 线上格式 | 说明 |
+|------|------|---------|------|
+| `session_id` | UUID | `sessionId` | 会话 ID |
+| `content` | str | `content` | 消息内容 |
+| `reply_to_id` | UUID \| None | `replyToId` | 回复目标消息 ID (可选) |
 
 #### WSTriggerAction
 
@@ -314,7 +316,7 @@ WebSocket 消息协议 Schema。
 | `type` | str | `"agentStatus"` |
 | `session_id` | UUID | 会话 ID |
 | `agent_id` | str | 智能体 ID |
-| `status` | str | 状态: `analyzing` / `executing` / `completed` / `failed` |
+| `status` | str | 持久化: `online` / `offline` / `busy` / `error`；瞬时: `analyzing` / `executing` / `completed` / `failed` |
 | `display_text` | str | 显示文本 |
 
 #### WSMessageChunk
