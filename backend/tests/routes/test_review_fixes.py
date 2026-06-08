@@ -135,19 +135,21 @@ class TestOrchestratorClientReuse:
 
 
 class TestAdapterNotImplemented:
-    """Codex and OpenCode adapters should raise NotImplementedError."""
+    """Codex and OpenCode adapters should be instantiable."""
 
-    def test_codex_adapter_raises_not_implemented(self):
-        """get_adapter('codex') should raise NotImplementedError."""
+    def test_codex_adapter_instantiates(self):
+        """get_adapter('codex') should return a CodexAdapter instance."""
         from app.agents.registry import get_adapter
-        with pytest.raises(NotImplementedError, match="not yet implemented"):
-            get_adapter("codex")
+        from app.agents.providers.codex import CodexAdapter
+        adapter = get_adapter("codex")
+        assert isinstance(adapter, CodexAdapter)
 
-    def test_opencode_adapter_raises_not_implemented(self):
-        """get_adapter('opencode') should raise NotImplementedError."""
+    def test_opencode_adapter_instantiates(self):
+        """get_adapter('opencode') should return an OpenCodeAdapter instance."""
         from app.agents.registry import get_adapter
-        with pytest.raises(NotImplementedError, match="not yet implemented"):
-            get_adapter("opencode")
+        from app.agents.providers.opencode import OpenCodeAdapter
+        adapter = get_adapter("opencode")
+        assert isinstance(adapter, OpenCodeAdapter)
 
 
 # ── P2 #8: Error classification not comprehensive ─────────────────────

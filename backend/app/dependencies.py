@@ -28,7 +28,7 @@ async def get_current_user(
     jti = payload.get("jti")
     if jti:
         redis = await get_redis_client()
-        if await redis.exists(f"bl:{jti}"):
+        if redis and await redis.exists(f"bl:{jti}"):
             raise HTTPException(status_code=401, detail="Token has been revoked")
 
     user_id = payload.get("sub")

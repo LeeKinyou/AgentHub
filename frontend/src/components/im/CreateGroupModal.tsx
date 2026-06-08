@@ -41,6 +41,12 @@ export function CreateGroupModal({ isOpen, onClose, availableAgents, onCreate }:
           className="w-full px-4 py-2 mb-4 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors"
         />
         <p className="text-xs text-zinc-500 mb-2">选择要拉入群组的智能体（至少 2 位）：</p>
+        {availableAgents.length === 0 ? (
+          <div className="text-center py-8 text-zinc-500">
+            <p className="text-sm">暂无可用智能体</p>
+            <p className="text-xs mt-1">请先在设置中添加智能体</p>
+          </div>
+        ) : (
         <div className="space-y-2 max-h-48 overflow-y-auto mb-4 scrollbar-thin scrollbar-thumb-zinc-800">
           {availableAgents.map((agent) => (
             <button
@@ -69,6 +75,7 @@ export function CreateGroupModal({ isOpen, onClose, availableAgents, onCreate }:
             </button>
           ))}
         </div>
+        )}
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors">取消</button>
           <button

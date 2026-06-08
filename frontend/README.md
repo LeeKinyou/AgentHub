@@ -1,128 +1,151 @@
 # AgentHub Frontend
 
-> 🚀 智能体多维协作与全栈编程平台 - 前端应用
+> 多 Agent 协作全栈编程平台 — 前端应用
 
-## 📋 项目概述
+## 项目概述
 
-AgentHub 是一个基于多智能体协作的全栈编程平台，前端采用 Next.js 14 + React 18 + TypeScript 构建，提供类 Trae / VS Code 的五栏布局交互体验。
+AgentHub 是一个基于 IM 聊天范式的多 Agent 协作编程平台。前端采用 Next.js 14 + React 18 + TypeScript 构建，提供类 Trae / VS Code 的五栏布局，支持文件系统集成、实时 WebSocket 通信、Agent 文件控制、Markdown 渲染等完整功能。
 
-## 🏗️ 技术栈
+## 技术栈
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | Next.js | 14.2.3 | React 全栈框架 |
 | React | 18.3.1 | UI 组件库 |
 | TypeScript | 5.4.5 | 类型安全 |
-| Tailwind CSS | 3.4.3 | 原子化样式 |
+| Tailwind CSS | 3.4.3 | 原子化样式 + 明暗主题 |
 | react-markdown | 10.x | Markdown 渲染 + Mermaid 拦截 |
-| File System Access API | - | 本地文件读写 |
+| File System Access API | — | 本地文件读写 |
+| WebSocket | — | 实时消息流 + Agent 状态推送 |
 
-## 🎨 核心布局
+## 核心布局
 
 ```
-┌──────────┬────────┬──────────────┬───────────────────────┐
-│ Project  │  File  │   Session    │   ChatArea            │
-│  Dock    │ Explorer│  Sidebar    │  ┌─────────────────┐  │
-│  (w-16)  │ (w-60) │  (可拖拽)    │  │  Messages + Input│  │
-│          │ 可折叠  │  单聊/群聊   │  └─────────────────┘  │
-│          │        │  折叠分组    │   AgentSidebar        │
-│          │        │              │   (CodeEditor)        │
-├──────────┴────────┴──────────────┴───────────────────────┤
-│  ConsolePanel（永久常驻底部 · 点击状态栏展开/收起）         │
-└──────────────────────────────────────────────────────────┘
+┌──────────┬────────┬──────────────┬───────────────────────────┐
+│ Project  │  File  │   Session    │   ChatArea                │
+│  Dock    │Explorer│   Sidebar    │  ┌─────────────────────┐  │
+│  (w-16)  │ (w-60) │  (可拖拽)    │  │ Messages + Input    │  │
+│          │ 可折叠  │  单聊/群聊   │  └─────────────────────┘  │
+│          │        │  折叠分组    │   AgentSidebar            │
+│          │        │              │   (CodeEditor)            │
+├──────────┴────────┴──────────────┴───────────────────────────┤
+│  ConsolePanel（永久常驻底部 · 点击状态栏展开/收起）             │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-- **ProjectDock**: Discord 风格项目图标坞 + 新建/打开项目 + ⚙️ 设置 + 🔄 重置 + 主题切换
-- **FileExplorer**: 独立文件树列（点击项目图标展开/折叠，`w-60` / `w-0`）
-- **ContextSidebar**: 会话列表（单聊/群聊折叠分组 + AvatarStack 头像堆叠）
-- **ChatArea**: 聊天画布 + 输入框 + 上下文胶囊 + ArtifactPanel
-- **AgentSidebar**: 代码编辑器 + Agent 面板（可拖拽宽度）
-- **ConsolePanel**: 全局底部终端控制台（`h-9` 状态栏 + `h-72` 日志区，flex 弹性挤压）
+## 核心功能
 
-## 🎯 核心功能
+### 1. 认证系统
 
-### 1. 多项目管理
+- JWT 登录/注册，access + refresh token
+- 自动 token 刷新，登录过期跳转
+- API 密钥 AES-256 加密存储
 
-- 点击 `+` 按钮打开/新建项目，项目图标坞支持多项目切换
-- 点击已激活项目图标可折叠/展开文件树
+### 2. 多项目管理
+
+- 点击 `+` 新建项目 → 弹窗选择父目录 + 输入项目名
+- 通过 File System Access API 在本地磁盘创建项目文件夹
+- 项目图标坞支持多项目切换，点击可折叠/展开文件树
 - 项目数据自动持久化到 localStorage
 
-### 2. 会话系统
+### 3. 文件系统集成
 
-- **单聊模式 (Direct)**: 1 对 1 与 AI Agent 对话，`+` 按钮单选 Agent 创建
-- **群聊协作 (Groups)**: 多 Agent 协作，`+` 按钮打开 CreateGroupModal（需选 ≥2 个 Agent）
-- 分组支持折叠/展开（Chevron 动画），群聊条目自动挂载 AvatarStack
-
-### 3. Mock 剧本系统
-
-输入关键词触发仿真消息流，验证多模态渲染：
-
-| 关键词 | 剧本 | 验证目标 |
-|--------|------|----------|
-| `测试群聊` | Orchestrator + Codex 连续回复 | 多 Agent 气泡排列 |
-| `测试Diff` | diff_patch 富媒体消息 | InlineDiffCard 红绿对比 + Apply to File |
-| `测试部署` | building → 2s → success | DeployStatusCard 动画过渡 + 预览 URL |
-
-### 4. 文件系统集成
-
-- **File Explorer**: 递归文件树 + 右键菜单（新建/复制/删除）
-- **File System Access API**: 真实文件读取/写入
+- **File Explorer**: 递归文件树 + 右键菜单（新建/复制/删除/重命名）
+- **File System Access API**: 真实文件读写，支持重新授权
 - **拖拽联动**: 文件拖拽到输入框生成上下文胶囊
+- **文件操作协议 (`@file_operation`)**: Agent 通过 JSON 指令创建/修改/删除文件
+- **一键授权模式**: 新建项目后自动开启，Agent 文件操作无需逐个确认
+- **Diff 预览**: FileOperationDialog 显示文件变更对比，支持批量审批
 
-### 5. 代码编辑器
+### 4. 会话系统
 
-- **CodeEditor**: 可编辑 textarea + 💾 Save + Ctrl/Cmd+S 快捷键
+- **单聊模式**: 1 对 1 与 Agent 对话
+- **群聊协作**: 多 Agent 协作，编排器自动规划 + 分派
+- 分组支持折叠/展开，群聊条目自动挂载 AvatarStack 头像堆叠
+
+### 5. Agent 系统
+
+默认 4 个 Agent：
+
+| 名称 | 角色 | 说明 |
+|------|------|------|
+| MiMo | expert | 小米 MiMo 大模型 |
+| 前端工程师 | expert | 前端开发专家 |
+| 后端工程师 | expert | 后端开发专家 |
+| 编排器 | orchestrator | 任务编排调度 |
+
+- **编排器**: 接收任务后先回复规划确认，再分派给专家 Agent
+- **多适配器**: 支持 Claude Code / Codex / OpenCode / Custom
+- **文件控制**: 所有 Agent 通过 `@file_operation` 指令操作文件
+
+### 6. 消息系统
+
+- **流式传输**: WebSocket 实时推送 Agent 回复
+- **Markdown 渲染**: 标题、代码块、表格、列表、引用、链接等完整渲染
+- **处理状态指示器**: 发送中（弹跳点）/ 处理中（旋转图标）/ 流式（脉冲标签）/ 错误 / 已中断
+- **停止生成**: 流式输出时可随时打断，显示"已中断"提示
+- **重新生成**: 中断或错误后可一键重试
+- **Pin 消息**: 标记重要消息，自动注入上下文
+- **复制/重新生成**: 每条 Agent 消息底部操作按钮
+- **附件显示**: 发送附件后在消息气泡下方显示文件卡片
+
+### 7. 代码编辑器
+
+- **CodeEditor**: 可编辑 textarea + Save + Ctrl/Cmd+S 快捷键
 - **TabBar**: 多标签页管理 + 单击预览 / 双击固定
 - **Markdown 预览**: react-markdown 渲染 + Mermaid 代码块安全拦截
 - **Diff 视图**: Accept/Reject 浮动操作栏 + 行级高亮
 
-### 6. 智能输入系统
+### 8. 智能输入系统
 
 - **@Mentions**: 正则检测 + 键盘导航 + Enter 确认
 - **/ 快捷指令**: `/explain`、`/bug`、`/test`
-- **Context Capsules**: Agent（暗紫）/ File（暗灰）/ Snippet（浅灰）
-- **文件拖拽**: 从文件树拖拽到输入框自动生成附件胶囊
+- **Context Capsules**: Agent / File / Snippet 胶囊
+- **文件拖拽**: 从文件树拖拽到输入框自动生成附件
 
-### 7. 设置系统 (SettingsModal)
+### 9. 设置系统
 
 两栏式弹窗，左侧菜单 + 右侧面板：
 
-- **💻 通用设置**: 占位（即将上线）
-- **🤖 智能体管理**: 已注册 Agent 列表 + 自定义添加表单（名称/服务商/型号/API 密匙/System Prompt）
-- **🔐 工作区安全**: 占位（即将上线）
-- **📊 额度统计**: 占位（即将上线）
+- **通用设置**: 基础配置
+- **智能体管理**: Agent 列表 CRUD（新增/编辑/删除）
+- **工作区安全**: API 密钥加密、会话超时、审计日志、CORS 配置
+- **额度统计**: Token 用量追踪、每日柱状图、模型明细
 
-### 8. 控制台日志面板
+### 10. 控制台面板
 
-- **ConsolePanel**: 全局底部永久常驻，自适应除 ProjectDock 外的全部宽度
-- **状态栏**: `h-9`，点击切换展开/收起，Chevron 旋转动画
-- **日志分级**: error（红）、success（绿）、warn（黄）、info（灰）
-- **弹性挤压**: 展开时 `h-72`，收起时 `h-0`，物理性挤压上方内容区
+- **ConsolePanel**: 全局底部永久常驻
+- **macOS 风格**: 红绿黄交通灯 + TERMINAL 标题 + 错误/警告计数徽章
+- **日志分级**: ERR（红）/ WARN（黄）/ INFO（蓝）/ OK（绿）+ 行号 + 时间戳
+- **主题适配**: 浅色/深色主题自动切换
+- **空状态**: 光标闪烁动画
 
-### 9. 多模态富媒体消息
+### 11. 多模态富媒体消息
 
 - **InlineDiffCard**: 内联 Diff 卡片（红绿对比 + Apply to File）
-- **DeployStatusCard**: 部署状态卡片（building/deploying/success + 进度条动画）
+- **DeployStatusCard**: 部署状态卡片（building/deploying/success + 进度条）
 - **AvatarStack**: 群聊头像堆叠（Hover 发散动画）
 - **ArtifactPanel**: HTML 实时预览 + 代码大画布
+- **OrchestratorStatusCard**: 编排器状态卡片（步骤连接线 + 状态指示）
+- **AgentStatusCard**: Agent 执行状态卡片（进度条 + 状态标签）
 
-## 🚀 快速开始
+## 快速开始
 
 ### 环境要求
 
 - Node.js >= 18.0.0
-- pnpm >= 8.0.0（推荐）或 npm >= 9.0.0
+- npm >= 9.0.0 或 pnpm >= 8.0.0
 
 ### 安装依赖
 
 ```bash
-pnpm install
+npm install
 ```
 
 ### 启动开发服务器
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 开发服务器将在 http://localhost:3000 启动。
@@ -130,55 +153,82 @@ pnpm dev
 ### 构建生产版本
 
 ```bash
-pnpm build
+npm run build
 ```
 
-## 📁 项目结构
+## 项目结构
 
 ```
 frontend/
 ├── src/
 │   ├── app/
-│   │   ├── globals.css          # Tailwind 全局样式 + 滚动条定制
-│   │   ├── layout.tsx           # 根布局
-│   │   └── page.tsx             # 主页面（全局状态中枢 + 五栏布局编排）
+│   │   ├── globals.css              # Tailwind 全局样式 + 滚动条 + 主题变量
+│   │   ├── layout.tsx               # 根布局
+│   │   ├── page.tsx                 # 主页面（全局状态中枢 + 五栏布局编排）
+│   │   └── login/page.tsx           # 登录/注册页面
 │   ├── components/im/
-│   │   ├── AgentSidebar.tsx     # 右侧 Agent 面板
-│   │   ├── ArtifactPanel.tsx    # 代码大画布
-│   │   ├── ArtifactPreview.tsx  # HTML 实时预览
-│   │   ├── AvatarStack.tsx      # 群聊头像堆叠
-│   │   ├── ChatArea.tsx         # 聊天画布（消息 + 输入）
-│   │   ├── ChatHeader.tsx       # 聊天头部（Agent 头像 + 编辑器切换）
-│   │   ├── CodeEditor.tsx       # 代码编辑器 + Markdown 预览
-│   │   ├── ConsolePanel.tsx     # 控制台日志面板（全局底部常驻）
-│   │   ├── ContextSidebar.tsx   # 会话侧边栏容器
-│   │   ├── CreateGroupModal.tsx # 建群弹窗（≥2 Agent 拦截）
-│   │   ├── CreateSessionModal.tsx # 新建会话弹窗（支持 singleSelect）
-│   │   ├── DeployStatusCard.tsx # 部署状态卡片
-│   │   ├── FileExplorer.tsx     # 文件树（独立列）
-│   │   ├── InlineDiffCard.tsx   # 内联 Diff 卡片
-│   │   ├── InputContextArea.tsx  # 输入上下文区域
-│   │   ├── ProjectDock.tsx      # 项目坞（图标 + 设置 + 主题）
-│   │   ├── SessionSidebar.tsx   # 会话列表（单聊/群聊折叠分组）
-│   │   ├── SettingsModal.tsx    # 设置弹窗（四 Tab + 智能体管理）
-│   │   ├── TabBar.tsx           # 标签栏
-│   │   ├── ThemeToggle.tsx      # 主题切换
+│   │   ├── AgentManagerPanel.tsx    # 智能体管理面板（CRUD）
+│   │   ├── AgentSidebar.tsx         # 右侧 Agent 面板
+│   │   ├── AgentStatusCard.tsx      # Agent 执行状态卡片
+│   │   ├── ArtifactPanel.tsx        # 代码大画布
+│   │   ├── ArtifactPreview.tsx      # HTML 实时预览
+│   │   ├── AvatarStack.tsx          # 群聊头像堆叠
+│   │   ├── ChatArea.tsx             # 聊天画布（消息 + 输入 + 状态指示）
+│   │   ├── ChatHeader.tsx           # 聊天头部
+│   │   ├── CodeEditor.tsx           # 代码编辑器 + Markdown 预览
+│   │   ├── CodeSelectionChat.tsx    # 代码选中聊天
+│   │   ├── CodeViewer.tsx           # 代码查看器
+│   │   ├── ConsolePanel.tsx         # 控制台日志面板（终端风格）
+│   │   ├── ContextSidebar.tsx       # 会话侧边栏容器
+│   │   ├── CreateGroupModal.tsx     # 建群弹窗
+│   │   ├── CreateProjectModal.tsx   # 新建项目弹窗（文件夹选择）
+│   │   ├── CreateSessionModal.tsx   # 新建会话弹窗
+│   │   ├── DeployStatusCard.tsx     # 部署状态卡片
+│   │   ├── DocumentPreview.tsx      # 文档预览
+│   │   ├── FileAttachment.tsx       # 文件附件卡片
+│   │   ├── FileContextMenu.tsx      # 文件右键菜单
+│   │   ├── FileExplorer.tsx         # 文件树
+│   │   ├── FileOperationDialog.tsx  # 文件操作确认弹窗
+│   │   ├── FullscreenPreview.tsx    # 全屏预览
+│   │   ├── GeneralSettingsPanel.tsx # 通用设置面板
+│   │   ├── InlineDiffCard.tsx       # 内联 Diff 卡片
+│   │   ├── InputBar.tsx             # 输入框
+│   │   ├── InputContextArea.tsx     # 输入上下文区域
+│   │   ├── MarkdownRenderer.tsx     # Markdown 渲染器
+│   │   ├── MentionList.tsx          # @提及列表
+│   │   ├── MessageCard.tsx          # 消息卡片
+│   │   ├── OrchestratorStatusCard.tsx # 编排器状态卡片
+│   │   ├── PinnedMessages.tsx       # Pin 消息列表
+│   │   ├── ProjectDock.tsx          # 项目坞（图标 + 设置 + 主题）
+│   │   ├── SecuritySettingsPanel.tsx # 安全设置面板
+│   │   ├── SessionSidebar.tsx       # 会话列表
+│   │   ├── SettingsModal.tsx        # 设置弹窗
+│   │   ├── TabBar.tsx               # 标签栏
+│   │   ├── ThemeToggle.tsx          # 主题切换
+│   │   ├── UsageStatsPanel.tsx      # 额度统计面板
+│   │   ├── VersionHistory.tsx       # 版本历史
+│   │   ├── fileSystemUtils.ts       # 文件系统工具函数
 │   │   └── mockData.ts / mockFiles.ts / mockProjects.ts
 │   ├── hooks/
-│   │   ├── useEditorTabs.ts     # 多标签页管理
-│   │   ├── useProjectState.ts   # 项目状态 + localStorage
-│   │   ├── useTheme.ts          # 明暗主题持久化
-│   │   └── useWebSocket.ts      # WebSocket 连接
+│   │   ├── useBackendData.ts        # 后端数据获取（agents/sessions）
+│   │   ├── useEditorTabs.ts         # 多标签页管理
+│   │   ├── useFileOperations.ts     # @file_operation 解析与执行
+│   │   ├── useProjectState.ts       # 项目状态 + localStorage
+│   │   ├── useTheme.ts              # 明暗主题持久化
+│   │   ├── useUsageTracker.ts       # Token 用量追踪
+│   │   └── useWebSocket.ts          # WebSocket 连接 + 流式消息
+│   ├── lib/
+│   │   └── api.ts                   # API 客户端（fetch + token 刷新）
 │   ├── mock/
-│   │   └── mockScripts.ts       # Mock 剧本（测试群聊/Diff/部署）
+│   │   └── mockScripts.ts           # Mock 剧本
 │   └── types/
-│       └── file-system-access.d.ts
+│       └── file-system-access.d.ts  # File System Access API 类型声明
 ├── package.json
 ├── tailwind.config.js
 └── tsconfig.json
 ```
 
-## ⌨️ 快捷键
+## 快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
@@ -190,19 +240,14 @@ frontend/
 | `↑/↓` | 导航提及/指令列表 |
 | `Escape` | 关闭弹出层 |
 
-## 🐛 常见问题
+## 后端服务
 
-### Q: 文件读取失败怎么办？
+前端需要后端 API 服务支持（默认 http://localhost:8001）：
 
-A: 如果出现 `NotAllowedError`，请重新打开文件夹以激活文件读写权限。
-
-### Q: 如何重置工作区？
-
-A: 点击 ProjectDock 底部 🔄 按钮，确认后会清除所有本地数据并刷新页面。
-
-### Q: 新添加的智能体在哪里使用？
-
-A: 在设置弹窗添加的自定义智能体会自动出现在建群弹窗的可勾选列表中。
+```bash
+cd ../backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+```
 
 ---
 

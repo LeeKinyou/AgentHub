@@ -33,8 +33,15 @@ export function useProjectState() {
   useEffect(() => { localStorage.setItem(KEYS.activeSessionId, JSON.stringify(activeSessionId)); }, [activeSessionId]);
 
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null;
-  const activeSession = activeProject?.sessions.find((s) => s.id === activeSessionId) ?? activeProject?.sessions[0] ?? null;
+  const activeSession = activeProject?.sessions.find((s) => s.id === activeSessionId) ?? null;
   const activeFileTree = activeProjectId ? (realFileTrees[activeProjectId] ?? activeProject?.fileTree) : null;
+
+  // Sync activeSessionId if it becomes stale (e.g., session deleted externally)
+  useEffect(() => {
+    if (activeProject && activeSessionId && !activeProject.sessions.find((s) => s.id === activeSessionId)) {
+      setActiveSessionId(activeProject.sessions[0]?.id ?? null);
+    }
+  }, [activeProject, activeSessionId]);
 
   const handleSelectProject = useCallback((projectId: string) => {
     setActiveProjectId(projectId);
@@ -48,12 +55,19 @@ export function useProjectState() {
 
   const handleDeleteSession = useCallback((sessionId: string) => {
     if (!activeProjectId) return;
-    setProjects((prev) => prev.map((p) => (p.id === activeProjectId ? { ...p, sessions: p.sessions.filter((s) => s.id !== sessionId) } : p)));
-    if (activeSessionId === sessionId) {
-      const remaining = activeProject?.sessions.filter((s) => s.id !== sessionId) ?? [];
-      setActiveSessionId(remaining[0]?.id ?? null);
+    let nextActiveId: string | null | undefined;
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== activeProjectId) return p;
+      const remaining = p.sessions.filter((s) => s.id !== sessionId);
+      if (activeSessionId === sessionId) {
+        nextActiveId = remaining[0]?.id ?? null;
+      }
+      return { ...p, sessions: remaining };
+    }));
+    if (nextActiveId !== undefined) {
+      setActiveSessionId(nextActiveId);
     }
-  }, [activeProjectId, activeSessionId, activeProject]);
+  }, [activeProjectId, activeSessionId]);
 
   const handleOpenProject = useCallback(async () => {
     const fileTree = await openDirectoryPicker();
@@ -71,6 +85,16 @@ export function useProjectState() {
     setActiveSessionId(null);
   }, []);
 
+  const createProject = useCallback((name: string, icon: string, fileTree: FileNode, parentDirHandle?: FileSystemDirectoryHandle) => {
+    const newId = crypto.randomUUID();
+    const newProject: Project = { id: newId, name, icon, fileTree, sessions: [] };
+    setProjects((prev) => [...prev, newProject]);
+    setActiveProjectId(newId);
+    setActiveSessionId(null);
+    // Store the real file tree so the sidebar displays the project folder
+    setRealFileTrees((prev) => ({ ...prev, [newId]: fileTree }));
+  }, []);
+
   const handleOpenFile = useCallback(async (name: string, handle: FileSystemFileHandle) => {
     try {
       return { name, handle, error: null };
@@ -83,10 +107,10 @@ export function useProjectState() {
     }
   }, []);
 
-  const handleCreateSession = useCallback((selectedAgentIds: string[], sessionName: string) => {
+  const handleCreateSession = useCallback((selectedAgentIds: string[], sessionName: string, backendSessionId?: string) => {
     if (!activeProjectId) return;
     const newSession: Session = {
-      id: crypto.randomUUID(), title: sessionName,
+      id: backendSessionId ?? crypto.randomUUID(), title: sessionName,
       type: selectedAgentIds.length > 1 ? 'group' : 'single',
       agentIds: selectedAgentIds, createdAt: new Date().toISOString(),
     };
@@ -94,15 +118,30 @@ export function useProjectState() {
     setActiveSessionId(newSession.id);
   }, [activeProjectId]);
 
-  const handleCreateGroup = useCallback((title: string, selectedAgentIds: string[]) => {
+  const handleCreateGroup = useCallback((title: string, selectedAgentIds: string[], backendSessionId?: string) => {
     if (!activeProjectId) return;
     const newSession: Session = {
-      id: crypto.randomUUID(), title,
+      id: backendSessionId ?? crypto.randomUUID(), title,
       type: 'group',
       agentIds: selectedAgentIds, createdAt: new Date().toISOString(),
     };
     setProjects((prev) => prev.map((p) => (p.id === activeProjectId ? { ...p, sessions: [...p.sessions, newSession] } : p)));
     setActiveSessionId(newSession.id);
+  }, [activeProjectId]);
+
+  const updateSessionMeta = useCallback((sessionId: string, meta: { lastMessagePreview?: string }) => {
+    if (!activeProjectId) return;
+    const now = new Date().toISOString();
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== activeProjectId) return p;
+      return {
+        ...p,
+        sessions: p.sessions.map((s) => {
+          if (s.id !== sessionId) return s;
+          return { ...s, lastActiveAt: now, ...meta };
+        }),
+      };
+    }));
   }, [activeProjectId]);
 
   const handleTogglePinSession = useCallback((sessionId: string) => {
@@ -187,7 +226,8 @@ export function useProjectState() {
   return {
     projects, activeProjectId, activeSessionId, activeProject, activeSession, activeFileTree,
     setActiveSessionId, setRealFileTrees, handleSelectProject, handleDeleteProject,
-    handleDeleteSession, handleOpenProject, handleNewProject, handleOpenFile, handleCreateSession, handleCreateGroup, handleFileAction,
-    handleTogglePinSession, handleToggleArchiveSession,
+    handleDeleteSession, handleOpenProject, handleNewProject, createProject, handleOpenFile, handleCreateSession, handleCreateGroup, handleFileAction,
+    handleTogglePinSession, handleToggleArchiveSession, updateSessionMeta,
+    updateFileTree,
   };
 }

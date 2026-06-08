@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import AsyncGenerator, Union
 
 import anthropic
+import openai
 
 from .base_adapter import AgentStatusEvent, BaseAdapter, Message, MessageChunk
 from .registry import get_adapter
@@ -120,6 +121,8 @@ class Orchestrator:
         self._adapters: dict[str, BaseAdapter] = {}
         self._planner_client: anthropic.AsyncAnthropic | None = None
         self._planner_api_key: str | None = None
+        self._planner_openai_client: openai.AsyncOpenAI | None = None
+        self._planner_openai_api_key: str | None = None
 
     # ------------------------------------------------------------------ #
     #  Public entry point                                                  #
@@ -175,10 +178,17 @@ class Orchestrator:
                 session_id,
             )
             fallback = agent_roster[0]
-            yield AgentStatusEvent(
+            yield MessageChunk(
+                chunk_type="text",
+                content=f"📋 **收到！** 正在交给 {fallback.name} 处理…",
+                is_final=False,
                 agent_id="orchestrator",
-                status="analyzing",
-                display_text=f"Falling back to {fallback.name}…",
+            )
+            yield MessageChunk(
+                chunk_type="text",
+                content="",
+                is_final=True,
+                agent_id="orchestrator",
             )
             async for event in self._delegate_single(
                 fallback,
@@ -201,6 +211,21 @@ class Orchestrator:
             "Execution plan for session %s: %d step(s)",
             session_id,
             len(steps),
+        )
+
+        # --- send planning acknowledgment to user ---
+        plan_summary = self._format_plan_summary(steps, agent_roster)
+        yield MessageChunk(
+            chunk_type="text",
+            content=plan_summary,
+            is_final=False,
+            agent_id="orchestrator",
+        )
+        yield MessageChunk(
+            chunk_type="text",
+            content="",
+            is_final=True,
+            agent_id="orchestrator",
         )
 
         # --- fast path: single-step plan, delegate directly ---
@@ -308,36 +333,65 @@ class Orchestrator:
         )
 
         # Pick the planning model: prefer an orchestrator-role agent's config
-        plan_model, plan_api_key = self._resolve_planner_credentials(agent_roster)
+        plan_model, plan_api_key, api_provider, base_url = self._resolve_planner_credentials(agent_roster)
 
         try:
-            # Reuse cached client if API key matches
-            if self._planner_client is None or self._planner_api_key != plan_api_key:
-                self._planner_client = anthropic.AsyncAnthropic(api_key=plan_api_key)
-                self._planner_api_key = plan_api_key
-
-            response = await self._planner_client.messages.create(
-                model=plan_model,
-                max_tokens=1024,
-                system=PLANNING_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            raw = response.content[0].text.strip()
+            if api_provider == "openai":
+                raw = await self._plan_with_openai(plan_model, plan_api_key, base_url, prompt)
+            else:
+                raw = await self._plan_with_anthropic(plan_model, plan_api_key, prompt)
             return self._parse_plan(raw, agent_roster)
 
         except Exception as exc:
             logger.exception("Planning LLM call failed: %s", exc)
             return None
 
+    async def _plan_with_anthropic(self, model: str, api_key: str, prompt: str) -> str:
+        """Plan using Anthropic Claude API."""
+        if self._planner_client is None or self._planner_api_key != api_key:
+            self._planner_client = anthropic.AsyncAnthropic(api_key=api_key, timeout=120.0)
+            self._planner_api_key = api_key
+
+        response = await self._planner_client.messages.create(
+            model=model,
+            max_tokens=1024,
+            system=PLANNING_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.content[0].text.strip()
+
+    async def _plan_with_openai(self, model: str, api_key: str, base_url: str, prompt: str) -> str:
+        """Plan using OpenAI-compatible API (e.g. MiMo)."""
+        from ..core.config import get_settings
+        settings = get_settings()
+
+        if self._planner_openai_client is None or self._planner_openai_api_key != api_key:
+            self._planner_openai_client = openai.AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url or settings.OPENAI_BASE_URL,
+                timeout=120.0,
+            )
+            self._planner_openai_api_key = api_key
+
+        response = await self._planner_openai_client.chat.completions.create(
+            model=model,
+            max_tokens=1024,
+            messages=[
+                {"role": "system", "content": PLANNING_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return response.choices[0].message.content.strip()
+
     @staticmethod
     def _resolve_planner_credentials(
         agent_roster: list[AgentDescriptor],
-    ) -> tuple[str, str]:
-        """Return (model, api_key) for the planning LLM.
+    ) -> tuple[str, str, str, str]:
+        """Return (model, api_key, api_provider, base_url) for the planning LLM.
 
         Preference order:
         1. An agent with role='orchestrator' in the roster
-        2. Global settings default
+        2. Global settings default (anthropic)
         """
         from ..core.config import get_settings
 
@@ -346,11 +400,13 @@ class Orchestrator:
                 cfg = agent.agent_config
                 model = cfg.get("model", "")
                 api_key = cfg.get("api_key", "")
+                api_provider = cfg.get("api_provider", "anthropic")
+                base_url = cfg.get("base_url", "")
                 if model and api_key:
-                    return model, api_key
+                    return model, api_key, api_provider, base_url
 
         settings = get_settings()
-        return settings.ANTHROPIC_MODEL, settings.ANTHROPIC_API_KEY
+        return settings.ANTHROPIC_MODEL, settings.ANTHROPIC_API_KEY, "anthropic", ""
 
     # ------------------------------------------------------------------ #
     #  Plan parsing & validation                                           #
@@ -520,6 +576,24 @@ class Orchestrator:
     # ------------------------------------------------------------------ #
 
     @staticmethod
+    def _format_plan_summary(
+        steps: list[PlanStep],
+        roster: list[AgentDescriptor],
+    ) -> str:
+        """Generate a user-friendly planning acknowledgment message."""
+        agent_map = {a.agent_id: a for a in roster}
+        lines = [f"📋 **收到！已为您规划 {len(steps)} 个步骤：**\n"]
+        for i, step in enumerate(steps, 1):
+            agent = agent_map.get(step.agent_id)
+            name = agent.name if agent else step.agent_id
+            emoji = "🎨" if "前端" in name or "frontend" in name.lower() else \
+                    "⚙️" if "后端" in name or "backend" in name.lower() else \
+                    "🧠" if "mimo" in name.lower() else "🤖"
+            lines.append(f"  {i}. {emoji} **{name}** — {step.task}")
+        lines.append("\n正在分配任务，请稍候…")
+        return "\n".join(lines)
+
+    @staticmethod
     def _find_agent(
         agent_id: str,
         roster: list[AgentDescriptor],
@@ -533,7 +607,14 @@ class Orchestrator:
         if agent.agent_id in self._adapters:
             return self._adapters[agent.agent_id]
 
-        adapter = get_adapter(agent.adapter_type, agent.agent_config)
+        # Inject system_prompt into agent_config so CustomAdapter can access it
+        config = dict(agent.agent_config or {})
+        if agent.system_prompt:
+            config["system_prompt"] = agent.system_prompt  # Override (not setdefault) to replace null
+        elif not config.get("system_prompt"):
+            config["system_prompt"] = "You are a helpful assistant."
+
+        adapter = get_adapter(agent.adapter_type, config)
         self._adapters[agent.agent_id] = adapter
         return adapter
 

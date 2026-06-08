@@ -25,7 +25,7 @@ export function ChatHeader({ title, sessionType, agents, isRightPanelOpen, onTog
   }, []);
 
   return (
-    <header className="relative h-14 px-4 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shrink-0 sticky top-0 z-30">
+    <header className="relative h-14 px-4 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shrink-0 z-30">
       <div className="flex items-center gap-3 min-w-0">
         <span className="text-lg shrink-0">{sessionType === 'group' ? '👥' : '💬'}</span>
         <div className="min-w-0">
