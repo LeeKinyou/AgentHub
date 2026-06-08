@@ -7,6 +7,7 @@ export interface ContextItem {
   id: string;
   type: 'file' | 'agent' | 'snippet';
   name: string;
+  content?: string; // File content (read from filesystem)
 }
 interface SlashCommand { id: string; label: string; desc: string; }
 const SLASH_COMMANDS: SlashCommand[] = [
@@ -20,6 +21,7 @@ interface InputContextAreaProps {
   onRemoveContext: (id: string) => void;
   onSend: (text: string) => void;
   onDropFile?: (fileName: string) => void;
+  onDropExternalFiles?: (files: FileList) => void;
   replyToId?: string | null;
   onClearReply?: () => void;
 }
@@ -47,7 +49,7 @@ function ContextChipsBar({ items, onRemove }: { items: ContextItem[]; onRemove: 
   );
 }
 
-export function InputContextArea({ agents, contextItems, onRemoveContext, onSend, onDropFile, replyToId, onClearReply }: InputContextAreaProps) {
+export function InputContextArea({ agents, contextItems, onRemoveContext, onSend, onDropFile, onDropExternalFiles, replyToId, onClearReply }: InputContextAreaProps) {
   const [text, setText] = useState('');
   const [mentionKey, setMentionKey] = useState('');
   const [isMentionOpen, setIsMentionOpen] = useState(false);
@@ -98,7 +100,15 @@ export function InputContextArea({ agents, contextItems, onRemoveContext, onSend
       }`}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setIsDragOver(true); }}
       onDragLeave={() => setIsDragOver(false)}
-      onDrop={(e) => { e.preventDefault(); setIsDragOver(false); const name = e.dataTransfer.getData('text/plain'); if (name && onDropFile) onDropFile(name); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        // Internal drag (from FileExplorer)
+        const name = e.dataTransfer.getData('text/plain');
+        if (name && onDropFile) { onDropFile(name); return; }
+        // External file drop (from OS file manager)
+        if (e.dataTransfer.files.length > 0 && onDropExternalFiles) { onDropExternalFiles(e.dataTransfer.files); }
+      }}
     >
       {isDragOver && (
         <div className="absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-indigo-400 dark:border-indigo-500 bg-indigo-50/80 dark:bg-indigo-500/10 z-40 pointer-events-none">

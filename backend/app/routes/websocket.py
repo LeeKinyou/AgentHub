@@ -327,7 +327,7 @@ async def websocket_endpoint(
     jti = payload.get("jti")
     if jti:
         redis = await get_redis_client()
-        if await redis.exists(f"bl:{jti}"):
+        if redis and await redis.exists(f"bl:{jti}"):
             await websocket.close(code=4003, reason="Token has been revoked")
             return
 

@@ -9,7 +9,7 @@ from .core.config import get_settings
 from .core.database import engine, Base
 from .core.redis import close_redis
 from .models import SessionAgent  # noqa: F401 — ensure create_all sees it
-from .routes import agents, auth, messages, sessions, users, websocket
+from .routes import agents, auth, deploy, messages, sessions, users, websocket
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sessions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(agents.router, prefix=settings.API_V1_PREFIX)
 app.include_router(messages.router, prefix=settings.API_V1_PREFIX)
+app.include_router(deploy.router)
 app.include_router(websocket.router)
 
 
