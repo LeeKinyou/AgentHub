@@ -1,8 +1,9 @@
 # AgentHub - 数据库设计文档
 
-> 文档版本：v1.0
-> 最后更新：2026-05-27
+> 文档版本：v1.1
+> 最后更新：2026-06-08
 > 存储引擎：PostgreSQL 15+ / Redis 7+
+> 迁移工具：Alembic（async 支持，基础设施已就绪，初始迁移尚未生成）
 
 ---
 
@@ -42,53 +43,105 @@
 
 > 字段映射由 ORM（SQLAlchemy）或 Pydantic 模型自动转换，严禁手写 SQL 时混用风格。
 
-### 2.2 `agent_profiles` 表
+### 2.2 `users` 表
+
+```sql
+-- 用户账户表
+CREATE TABLE users (
+    id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    username      VARCHAR(50)  NOT NULL UNIQUE,
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(128) NOT NULL,
+    avatar        VARCHAR(512),
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE users IS '用户账户表';
+COMMENT ON COLUMN users.id IS '主键，UUID v7（时间有序）';
+COMMENT ON COLUMN users.username IS '用户名，唯一';
+COMMENT ON COLUMN users.email IS '邮箱，唯一';
+COMMENT ON COLUMN users.password_hash IS 'bcrypt 哈希后的密码';
+COMMENT ON COLUMN users.avatar IS '头像 URL';
+COMMENT ON COLUMN users.created_at IS '创建时间，UTC';
+COMMENT ON COLUMN users.updated_at IS '最后更新时间，UTC';
+```
+
+### 2.3 `agent_profiles` 表
 
 ```sql
 -- 智能体静态元数据表
 CREATE TABLE agent_profiles (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    name        VARCHAR(100) NOT NULL,
-    avatar      VARCHAR(512),
-    role        VARCHAR(20)  NOT NULL CHECK (role IN ('orchestrator', 'expert')),
-    description TEXT,
+    id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID         REFERENCES users(id) ON DELETE CASCADE,  -- null = 系统内置 Agent
+    name          VARCHAR(100) NOT NULL,
+    avatar        VARCHAR(512),
+    role          VARCHAR(20)  NOT NULL CHECK (role IN ('orchestrator', 'expert')),
+    adapter_type  VARCHAR(50)  NOT NULL DEFAULT 'claude_code',  -- claude_code | codex | opencode | custom
+    description   TEXT,
     system_prompt TEXT,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    agent_config  JSONB,        -- 自定义 Agent 配置（tools, skills, mcp 等）
+    status        VARCHAR(20)  NOT NULL DEFAULT 'offline',  -- online | offline | busy | error
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-COMMENT ON TABLE agent_profiles IS '智能体静态元数据';
-COMMENT ON COLUMN agent_profiles.id IS '主键，UUID v4';
+CREATE INDEX ix_agent_profiles_user_id ON agent_profiles (user_id);
+
+COMMENT ON TABLE agent_profiles IS '智能体静态元数据 + 运行时状态';
+COMMENT ON COLUMN agent_profiles.id IS '主键，UUID v7（时间有序）';
+COMMENT ON COLUMN agent_profiles.user_id IS '所属用户 ID，null 表示系统内置 Agent';
 COMMENT ON COLUMN agent_profiles.name IS '智能体显示名称';
 COMMENT ON COLUMN agent_profiles.avatar IS '头像 URL';
 COMMENT ON COLUMN agent_profiles.role IS '角色类型：orchestrator=主编排器，expert=专家智能体';
+COMMENT ON COLUMN agent_profiles.adapter_type IS '适配器类型：claude_code | codex | opencode | custom';
 COMMENT ON COLUMN agent_profiles.description IS '能力描述，用于 Agent 市场展示';
 COMMENT ON COLUMN agent_profiles.system_prompt IS '系统提示词，注入 LLM 上下文';
+COMMENT ON COLUMN agent_profiles.agent_config IS '自定义 Agent 配置 JSONB（api_key, tools, skills, mcp）';
+COMMENT ON COLUMN agent_profiles.status IS '运行时状态：offline/busy/online/error，WebSocket 生命周期自动管理';
 COMMENT ON COLUMN agent_profiles.created_at IS '创建时间，UTC';
 ```
 
-### 2.3 `sessions` 表
+**`agent_profiles.status` 状态机**：
+- `offline` → `busy`：用户发送消息时，参与的 Agent 被标记为 busy
+- `busy` → `online`：Agent 执行完成
+- `busy` → `error`：Agent 执行失败
+- `busy`/`error` → `online`：WebSocket 断开连接时自动重置，防止状态卡死
+
+### 2.4 `sessions` 表
 
 ```sql
 -- IM 会话元数据表
 CREATE TABLE sessions (
-    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    title       VARCHAR(255) NOT NULL DEFAULT '新对话',
-    type        VARCHAR(10)  NOT NULL CHECK (type IN ('single', 'group')),
-    agent_ids   UUID[]       NOT NULL DEFAULT '{}',
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id              UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title                VARCHAR(255) NOT NULL DEFAULT '新对话',
+    type                 VARCHAR(10)  NOT NULL CHECK (type IN ('single', 'group')),
+    agent_ids            UUID[]       NOT NULL DEFAULT '{}',
+    is_pinned            BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_archived          BOOLEAN      NOT NULL DEFAULT FALSE,
+    last_active_at       TIMESTAMPTZ,
+    last_message_preview VARCHAR(200),
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX ix_sessions_user_id ON sessions (user_id);
+
 COMMENT ON TABLE sessions IS 'IM 会话元数据';
-COMMENT ON COLUMN sessions.id IS '主键，UUID v4';
+COMMENT ON COLUMN sessions.id IS '主键，UUID v7（时间有序）';
+COMMENT ON COLUMN sessions.user_id IS '所属用户 ID，外键关联 users.id，级联删除';
 COMMENT ON COLUMN sessions.title IS '会话标题，可由用户或 Orchestrator 自动命名';
 COMMENT ON COLUMN sessions.type IS '会话类型：single=单聊，group=群聊';
 COMMENT ON COLUMN sessions.agent_ids IS '参与的智能体 ID 数组，单聊时长度为1，群聊时包含 Orchestrator + 多个专家';
+COMMENT ON COLUMN sessions.is_pinned IS '是否置顶，置顶会话在列表中优先显示';
+COMMENT ON COLUMN sessions.is_archived IS '是否归档，归档会话默认不在列表中显示';
+COMMENT ON COLUMN sessions.last_active_at IS '最后活跃时间，消息写入时自动刷新，用于排序';
+COMMENT ON COLUMN sessions.last_message_preview IS '最后一条消息的前 200 字符预览，用于会话列表展示';
 COMMENT ON COLUMN sessions.created_at IS '创建时间，UTC';
 COMMENT ON COLUMN sessions.updated_at IS '最后更新时间，UTC，消息写入时自动刷新';
 ```
 
-### 2.4 `messages` 表
+### 2.5 `messages` 表
 
 ```sql
 -- 核心消息流表
@@ -100,21 +153,27 @@ CREATE TABLE messages (
     content      TEXT         NOT NULL DEFAULT '',
     content_type VARCHAR(20)  NOT NULL DEFAULT 'text' CHECK (content_type IN ('text', 'markdown', 'card')),
     card_data    JSONB,
+    reply_to_id  UUID         REFERENCES messages(id) ON DELETE SET NULL,  -- 引用回复，自引用外键
+    is_pinned    BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX ix_messages_session_id ON messages (session_id);
+
 COMMENT ON TABLE messages IS '核心消息流表，存储所有对话消息';
-COMMENT ON COLUMN messages.id IS '主键，UUID v4';
+COMMENT ON COLUMN messages.id IS '主键，UUID v7（时间有序）';
 COMMENT ON COLUMN messages.session_id IS '外键，关联 sessions.id，级联删除';
 COMMENT ON COLUMN messages.sender_type IS '发送者类型：user=用户，agent=智能体';
 COMMENT ON COLUMN messages.sender_id IS '发送者 ID，user 时为用户 ID，agent 时为 agent_profiles.id';
 COMMENT ON COLUMN messages.content IS '消息正文，text/markdown 时为纯文本，card 时为卡片标题或描述';
 COMMENT ON COLUMN messages.content_type IS '内容类型：text=纯文本，markdown=富文本，card=结构化卡片';
 COMMENT ON COLUMN messages.card_data IS '卡片数据 JSONB，当 content_type=card 时存储结构化产物';
+COMMENT ON COLUMN messages.reply_to_id IS '引用回复的消息 ID，自引用外键，被引用消息删除时置 NULL';
+COMMENT ON COLUMN messages.is_pinned IS '是否置顶/Pin，Pin 的消息在会话中高亮显示';
 COMMENT ON COLUMN messages.created_at IS '创建时间，UTC';
 ```
 
-### 2.5 `card_data` JSONB 结构规范
+### 2.6 `card_data` JSONB 结构规范
 
 ```jsonc
 // content_type = "card" 时的 card_data 结构
@@ -177,8 +236,12 @@ COMMENT ON COLUMN messages.created_at IS '创建时间，UTC';
 ```sql
 -- 会话历史消息按时间倒序翻页（IM 核心查询）
 -- 覆盖查询：WHERE session_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?
-CREATE INDEX idx_messages_session_created
+CREATE INDEX ix_messages_session_created
     ON messages (session_id, created_at DESC);
+
+-- 消息按 session_id 查询（ORM 反向引用常用）
+CREATE INDEX ix_messages_session_id
+    ON messages (session_id);
 
 -- 富媒体卡片高速检索（GIN 索引）
 -- 覆盖查询：WHERE card_data @> '{"card_type": "code_diff"}'
@@ -190,19 +253,30 @@ CREATE INDEX idx_messages_card_data
 CREATE INDEX idx_sessions_updated_at
     ON sessions (updated_at DESC);
 
+-- 会话按用户查询（多租户隔离）
+CREATE INDEX ix_sessions_user_id
+    ON sessions (user_id);
+
 -- Agent 角色类型筛选（Agent 市场）
 CREATE INDEX idx_agent_profiles_role
     ON agent_profiles (role);
+
+-- Agent 按用户查询（用户自定义 Agent 列表）
+CREATE INDEX ix_agent_profiles_user_id
+    ON agent_profiles (user_id);
 ```
 
 ### 3.2 索引设计说明
 
 | 索引名 | 类型 | 目标表 | 优化场景 |
 |--------|------|--------|----------|
-| `idx_messages_session_created` | B-Tree 复合 | `messages` | 会话内消息按时间倒序翻页，避免全表扫描 |
+| `ix_messages_session_created` | B-Tree 复合 | `messages` | 会话内消息按时间倒序翻页，避免全表扫描 |
+| `ix_messages_session_id` | B-Tree | `messages` | ORM 反向引用 + session_id 筛选 |
 | `idx_messages_card_data` | GIN | `messages` | 按 `card_type`、`status` 等 JSONB 内部字段高速检索 |
 | `idx_sessions_updated_at` | B-Tree | `sessions` | 会话列表按最近活跃排序 |
+| `ix_sessions_user_id` | B-Tree | `sessions` | 多租户：按用户查询会话列表 |
 | `idx_agent_profiles_role` | B-Tree | `agent_profiles` | Agent 市场按角色类型筛选 |
+| `ix_agent_profiles_user_id` | B-Tree | `agent_profiles` | 按用户查询自定义 Agent |
 
 ### 3.3 性能优化策略
 
@@ -268,6 +342,8 @@ agenthub:{业务域}:{实体}:{标识符}
 
 | Key 模式 | 类型 | TTL | 用途 |
 |----------|------|-----|------|
+| `bl:{jti}` | STRING | token 剩余有效期 | Access Token 黑名单（logout 时写入） |
+| `refresh:{user_id}` | STRING | 7天 | Refresh Token 存储（登录/刷新时覆盖） |
 | `agenthub:ws:connection:{user_id}` | STRING | 60s | 在线用户 WebSocket 节点标识 |
 | `agenthub:ws:session:{session_id}:users` | SET | 60s | 会话内在线用户集合 |
 | `agenthub:lock:session:{session_id}` | STRING | 5s | 群聊模式 Orchestrator 调度锁 |
@@ -390,13 +466,22 @@ if count > 60:
 
 | 检查项 | 状态 |
 |--------|------|
+| `users` 表唯一约束（username, email） | ✅ `UNIQUE` |
+| `sessions.user_id` 外键级联删除 | ✅ `ON DELETE CASCADE` |
+| `agent_profiles.user_id` 外键级联删除 | ✅ `ON DELETE CASCADE` |
 | `messages.session_id` 外键级联删除 | ✅ `ON DELETE CASCADE` |
+| `messages.reply_to_id` 自引用外键 | ✅ `ON DELETE SET NULL` |
 | `sender_type` 枚举约束 | ✅ `CHECK (sender_type IN ('user', 'agent'))` |
 | `sessions.type` 枚举约束 | ✅ `CHECK (type IN ('single', 'group'))` |
 | `agent_profiles.role` 枚举约束 | ✅ `CHECK (role IN ('orchestrator', 'expert'))` |
 | `messages.content_type` 枚举约束 | ✅ `CHECK (content_type IN ('text', 'markdown', 'card'))` |
-| 消息翻页复合索引 | ✅ `idx_messages_session_created` |
+| `agent_profiles.status` 状态机 | ✅ offline/busy/online/error |
+| 消息翻页复合索引 | ✅ `ix_messages_session_created` |
 | JSONB GIN 索引 | ✅ `idx_messages_card_data` |
+| 多租户用户索引 | ✅ `ix_sessions_user_id`, `ix_agent_profiles_user_id` |
 | `sessions.updated_at` 自动更新触发器 | ✅ `trg_messages_update_session` |
+| Token 黑名单 Redis Key | ✅ `bl:{jti}` TTL = 剩余有效期 |
+| Refresh Token Redis Key | ✅ `refresh:{user_id}` TTL = 7天 |
 | Redis 所有 Key 设置 TTL | ✅ 无永不过期 Key |
 | Redis 分布式锁自动释放 | ✅ TTL 5s |
+| Alembic 迁移基础设施 | ✅ 已就绪，初始迁移待生成 |
