@@ -72,7 +72,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
           <div>
             <label className="block text-xs text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 font-medium">用户名</label>
             <input
@@ -81,6 +81,7 @@ export default function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 bg-white/60 dark:bg-minimal-dark-surface/60 backdrop-blur-sm border border-minimal-glass-border dark:border-minimal-dark-glass-border rounded-minimal text-sm text-minimal-text dark:text-minimal-dark-text placeholder:text-minimal-tertiary dark:placeholder:text-minimal-dark-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300"
               placeholder="请输入用户名"
+              data-testid="login-username"
               required
             />
           </div>
@@ -94,6 +95,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 bg-white/60 dark:bg-minimal-dark-surface/60 backdrop-blur-sm border border-minimal-glass-border dark:border-minimal-dark-glass-border rounded-minimal text-sm text-minimal-text dark:text-minimal-dark-text placeholder:text-minimal-tertiary dark:placeholder:text-minimal-dark-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300"
                 placeholder="请输入邮箱"
+                data-testid="login-email"
                 required
               />
             </div>
@@ -107,6 +109,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 bg-white/60 dark:bg-minimal-dark-surface/60 backdrop-blur-sm border border-minimal-glass-border dark:border-minimal-dark-glass-border rounded-minimal text-sm text-minimal-text dark:text-minimal-dark-text placeholder:text-minimal-tertiary dark:placeholder:text-minimal-dark-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300"
               placeholder={mode === 'register' ? '请输入密码（至少8位）' : '请输入密码'}
+              data-testid="login-password"
               required
               minLength={mode === 'register' ? 8 : undefined}
             />
@@ -122,6 +125,7 @@ export default function LoginPage() {
             type="submit"
             disabled={isLoading}
             className="w-full py-2.5 bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border dark:disabled:bg-minimal-dark-border disabled:text-minimal-tertiary dark:disabled:text-minimal-dark-tertiary text-white text-sm font-medium rounded-minimal transition-colors duration-300"
+            data-testid="login-submit"
           >
             {isLoading ? '处理中...' : mode === 'login' ? '登录' : '注册'}
           </button>
@@ -134,6 +138,7 @@ export default function LoginPage() {
               setError('');
             }}
             className="text-sm text-minimal-accent hover:text-minimal-accent-hover transition-colors duration-300"
+            data-testid="login-toggle-mode"
           >
             {mode === 'login' ? '没有账户？点击注册' : '已有账户？点击登录'}
           </button>
