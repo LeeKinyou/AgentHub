@@ -28,7 +28,7 @@ export function useEditorActions(params: UseEditorActionsParams) {
 
   const handleSaveFile = useCallback(async (tab: { id: string; handle: FileSystemFileHandle; content: string }) => {
     if (!activeProjectId) return;
-    try { const w = await tab.handle.createWritable(); await w.write(tab.content); await w.close(); setTabClean(activeProjectId, tab.id); addLog('success', 'FileIO', `Saved ${tab.id}`); }
+    try { const opts = { mode: 'readwrite' as const }; /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ const h = tab.handle as any; let perm = await h.queryPermission(opts); if (perm !== 'granted') perm = await h.requestPermission(opts); if (perm !== 'granted') throw new DOMException('Permission denied', 'NotAllowedError'); const w = await tab.handle.createWritable(); await w.write(tab.content); await w.close(); setTabClean(activeProjectId, tab.id); addLog('success', 'FileIO', `Saved ${tab.id}`); }
     catch (err: unknown) { const msg = err instanceof Error && err.name === 'NotAllowedError' ? '文件句柄已失效，请重新打开文件夹授权' : '保存文件失败'; addLog('error', 'FileIO', msg); }
   }, [activeProjectId, setTabClean, addLog]);
 

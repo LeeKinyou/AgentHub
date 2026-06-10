@@ -6,6 +6,12 @@ export async function traverseDirectory(dirHandle: FileSystemDirectoryHandle): P
   const children: FileNode[] = [];
 
   try {
+    const opts = { mode: 'read' as const };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const h = dirHandle as any;
+    let perm = await h.queryPermission(opts);
+    if (perm !== 'granted') perm = await h.requestPermission(opts);
+    if (perm !== 'granted') return [];
     for await (const entry of dirHandle.values()) {
       if (entry.kind === 'directory') {
         if (IGNORED_DIRS.has(entry.name)) continue;

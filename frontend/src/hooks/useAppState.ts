@@ -183,7 +183,7 @@ export function useAppState() {
 
   // ── Sub-hooks ──
   const chatActions = useChatActions({ activeSessionId: state.activeSessionId, activeFileTree: state.activeFileTree, allMessages, setAllMessages, contextItems, setContextItems, allAgents, replyToId, setReplyToId, wsSendMessage, wsStopGeneration, setProcessingStatus, updateSessionMeta: state.updateSessionMeta, addLog });
-  const fileActions = useFileActions({ activeProjectId: state.activeProjectId, activeFileTree: state.activeFileTree, updateFileTree: state.updateFileTree, setRealFileTrees: state.setRealFileTrees, activeProjectTabs, updateTabContent, setAutoApprove, approveOperations, setOnApproved, addLog });
+  const fileActions = useFileActions({ activeProjectId: state.activeProjectId, activeFileTree: state.activeFileTree, updateFileTree: state.updateFileTree, setRealFileTrees: state.setRealFileTrees, setNeedsReauth: state.setNeedsReauth, activeProjectTabs, updateTabContent, setAutoApprove, approveOperations, setOnApproved, addLog });
   const sessionActions = useSessionActions({ handleCreateGroup: state.handleCreateGroup, handleCreateSession: state.handleCreateSession, handleDeleteSession: state.handleDeleteSession, handleTogglePinSession: state.handleTogglePinSession, handleToggleArchiveSession: state.handleToggleArchiveSession, handleSelectProject: state.handleSelectProject, activeProjectId: state.activeProjectId, activeProject: state.activeProject, createSession: backendData.createSession, deleteSession: backendData.deleteSession, updateSessionPin: backendData.updateSessionPin, updateSessionArchive: backendData.updateSessionArchive, setSessionModalOpen: ui.setSessionModalOpen, setGroupModalOpen: ui.setGroupModalOpen, setFilesExpanded: ui.setFilesExpanded, toggleFilesExpanded: ui.toggleFilesExpanded, addLog });
   const editorActions = useEditorActions({ activeProjectId: state.activeProjectId, openTab, setTabClean, setRightPanelOpen: ui.setRightPanelOpen, addLog });
 
@@ -194,7 +194,7 @@ export function useAppState() {
     theme, setTheme, state, backendData, allAgents, allMessages,
     isRightPanelOpen: ui.isRightPanelOpen, setIsRightPanelOpen: ui.setRightPanelOpen,
     isSessionModalOpen: ui.isSessionModalOpen, setIsSessionModalOpen: ui.setSessionModalOpen,
-    isConsoleOpen: ui.isConsoleOpen, setIsConsoleOpen: ui.toggleConsole,
+    isConsoleOpen: ui.isConsoleOpen, setIsConsoleOpen: ui.setConsoleOpen,
     isFilesExpanded: ui.isFilesExpanded, setIsFilesExpanded: ui.setFilesExpanded,
     isGroupModalOpen: ui.isGroupModalOpen, setIsGroupModalOpen: ui.setGroupModalOpen,
     isSingleChat, setIsSingleChat,

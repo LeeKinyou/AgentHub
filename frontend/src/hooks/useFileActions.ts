@@ -6,12 +6,14 @@ import type { FileOperation } from '@/components/im/FileOperationDialog';
 import type { EditorTab } from '@/hooks/useEditorTabs';
 import type { LogItem } from '@/components/im/ConsolePanel';
 import { writeFileAtPath, deleteFileAtPath, traverseDirectory } from '@/components/im/fileSystemUtils';
+import { saveDirHandle } from '@/utils/handleStore';
 
 interface UseFileActionsParams {
   activeProjectId: string | null;
   activeFileTree: FileNode | null;
   updateFileTree: (updater: (tree: FileNode) => FileNode) => void;
   setRealFileTrees: React.Dispatch<React.SetStateAction<Record<string, FileNode>>>;
+  setNeedsReauth: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   activeProjectTabs: (projectId: string | null) => { tabs: EditorTab[]; activeTabId: string | null };
   updateTabContent: (projectId: string, tabId: string, content: string) => void;
   setAutoApprove: (v: boolean) => void;
@@ -22,7 +24,7 @@ interface UseFileActionsParams {
 
 export function useFileActions(params: UseFileActionsParams) {
   const {
-    activeProjectId, activeFileTree, updateFileTree, setRealFileTrees,
+    activeProjectId, activeFileTree, updateFileTree, setRealFileTrees, setNeedsReauth,
     activeProjectTabs, updateTabContent, setAutoApprove, approveOperations,
     setOnApproved, addLog,
   } = params;
@@ -75,9 +77,11 @@ export function useFileActions(params: UseFileActionsParams) {
       const children = await traverseDirectory(dirHandle);
       const tree: FileNode = { name: dirHandle.name, type: 'dir', children, dirHandle };
       setRealFileTrees((prev: Record<string, FileNode>) => ({ ...prev, [activeProjectId!]: tree }));
+      setNeedsReauth((prev) => { const next = { ...prev }; delete next[activeProjectId!]; return next; });
+      await saveDirHandle(activeProjectId, dirHandle);
       addLog('success', 'FileIO', `已重新授权: ${dirHandle.name}`);
     } catch (err: unknown) { if (err instanceof DOMException && err.name === 'AbortError') return; addLog('error', 'FileIO', '重新授权失败'); }
-  }, [activeProjectId, setRealFileTrees, addLog]);
+  }, [activeProjectId, setRealFileTrees, setNeedsReauth, addLog]);
 
   const handleApproveAllFileOps = useCallback((ops: FileOperation[], remember: boolean) => {
     if (remember) setAutoApprove(true);
