@@ -120,7 +120,7 @@ export function useWebSocket({ sessionId, onChunk, onMessageComplete, onAgentSta
     return cleanup;
   }, [sessionId, connect, cleanup]);
 
-  const sendMessage = useCallback((content: string, replyToId?: string): boolean => {
+  const sendMessage = useCallback((content: string, replyToId?: string, mentionedAgents?: string[]): boolean => {
     if (wsRef.current?.readyState !== WebSocket.OPEN || !sessionIdRef.current) {
       // Queue for resend on reconnect (Bug #7)
       pendingMessagesRef.current.push({ content, timestamp: new Date().toISOString() });
@@ -129,6 +129,7 @@ export function useWebSocket({ sessionId, onChunk, onMessageComplete, onAgentSta
     const timestamp = new Date().toISOString();
     const payload: Record<string, unknown> = { sessionId: sessionIdRef.current, content };
     if (replyToId) payload.replyToId = replyToId;
+    if (mentionedAgents && mentionedAgents.length > 0) payload.mentionedAgents = mentionedAgents;
     wsRef.current.send(JSON.stringify({
       type: 'sendMessage',
       timestamp,

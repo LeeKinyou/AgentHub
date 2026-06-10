@@ -333,3 +333,250 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 - 人类反馈：操作栏的 translate-y 动画太明显，改为仅 opacity 变化
 - AI 调整：移除 translate-y class，仅保留 opacity-0 → opacity-100
 - 人类确认：符合克制风格，通过
+
+---
+
+## 六、纠错与迭代场景
+
+> 本节展示"AI 输出错误 → 人类纠正 → AI 修正"的真实对话模式，
+> 以及同一 Prompt 的版本演进过程。
+
+### 6.1 类型错误纠正
+
+**场景**：AI 生成的 WebSocket Schema 存在类型不匹配问题。
+
+**初始 Prompt**：
+```
+请为 WebSocket 消息定义 Pydantic Schema，支持以下消息类型：
+- ping/pong
+- sendMessage（用户发送消息）
+- agentStatus（Agent 状态推送）
+- messageChunk（消息流式片段）
+- messageComplete（消息完成）
+- error（错误）
+
+要求 camelCase 别名，使用 ConfigDict(alias_generator=...)。
+```
+
+**AI 输出（有问题）**：
+```python
+class SendMessagePayload(BaseModel):
+    session_id: UUID
+    content: str
+    reply_to_id: UUID | None = None
+
+class WSSendMessage(BaseModel):
+    type: str = "sendMessage"
+    timestamp: str
+    payload: SendMessagePayload
+```
+
+**人类纠正**：
+> `WSSendMessage` 的 `type` 字段应该是 Literal 类型而不是 str，否则无法做消息类型分发。
+> 另外 `SendMessagePayload` 缺少 `mentioned_agents` 字段，前端 @Agent 功能需要传递这个数据。
+
+**AI 修正**：
+```python
+class SendMessagePayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+    session_id: UUID
+    content: str = Field(min_length=1)
+    reply_to_id: UUID | None = None
+    mentioned_agents: list[UUID] | None = None
+
+class WSSendMessage(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+    type: Literal["sendMessage"] = "sendMessage"
+    timestamp: str
+    payload: SendMessagePayload
+```
+
+**修正要点**：
+- `type` 字段改为 `Literal` 类型，支持 Pydantic discriminated union
+- 新增 `mentioned_agents` 可选字段，支持 @Agent 路由
+- 确保所有模型都有 `model_config` 配置 camelCase 别名
+
+---
+
+### 6.2 UI 设计规范违反纠正
+
+**场景**：AI 生成的组件违反了苹果极简设计规范。
+
+**初始 Prompt**：
+```
+实现 Agent 状态指示器组件，显示 Agent 的在线/离线/忙碌状态。
+```
+
+**AI 输出（有问题）**：
+```tsx
+function StatusIndicator({ status }) {
+  const colors = {
+    online: 'bg-green-500 shadow-green-500/50',
+    offline: 'bg-gray-400',
+    busy: 'bg-yellow-500 shadow-yellow-500/50 animate-pulse',
+    error: 'bg-red-500 shadow-red-500/50',
+  };
+  return (
+    <div className={`w-3 h-3 rounded-full ${colors[status]}
+      shadow-lg transition-all duration-300`} />
+  );
+}
+```
+
+**人类纠正**：
+> 这个组件违反了多条设计规范：
+> 1. `shadow-lg` 是厚重阴影 — 规范要求"极其微妙"或不用阴影
+> 2. `animate-pulse` 是夸张动画 — 规范禁止弹跳、旋转、夸张缩放
+> 3. `shadow-green-500/50` 是霓虹发光效果 — 绝对禁止
+> 4. `w-3 h-3` 偏大，应使用 `w-2 h-2` 保持克制
+> 5. 颜色应使用项目的 semantic tokens（`bg-minimal-success`），不是 Tailwind 原色
+
+**AI 修正**：
+```tsx
+function StatusIndicator({ status }: { status?: 'online' | 'offline' | 'busy' | 'error' }) {
+  const colors: Record<string, string> = {
+    online: 'bg-minimal-success',
+    offline: 'bg-minimal-tertiary',
+    busy: 'bg-minimal-warning',
+    error: 'bg-minimal-error',
+  };
+  return (
+    <div className={`w-2 h-2 rounded-full ${colors[status ?? 'offline']} shrink-0`}
+      title={status ?? 'offline'} />
+  );
+}
+```
+
+**修正要点**：
+- 移除所有 `shadow-*` 和 `animate-*` 类
+- 使用项目的 semantic color tokens
+- 尺寸从 `w-3 h-3` 缩小到 `w-2 h-2`
+- 添加 `title` 属性作为无障碍访问的 tooltip
+
+---
+
+### 6.3 架构方案安全隐患纠正
+
+**场景**：AI 设计的 WebSocket 认证方案存在安全漏洞。
+
+**初始 Prompt**：
+```
+实现 WebSocket 连接的认证中间件，要求支持 JWT token 验证。
+```
+
+**AI 输出（有隐患）**：
+```python
+@router.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    await websocket.accept()
+    token = websocket.query_params.get("token")
+    if token:
+        try:
+            payload = decode_access_token(token)
+            # 继续处理...
+        except Exception:
+            await websocket.close(code=4003)
+    else:
+        # 允许匿名连接
+        pass
+```
+
+**人类纠正**：
+> 有三个安全问题：
+> 1. **匿名连接不应允许** — 无 token 时应该直接拒绝，不是 pass
+> 2. **token 验证应在 accept() 之前** — 先验证再接受连接，减少资源浪费
+> 3. **缺少 session 所有权校验** — 即使 token 有效，也要验证该用户是否有权访问这个 session
+
+**AI 修正**：
+```python
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, session_id: str, token: str | None = None):
+    # 认证在 accept 之前
+    if not token:
+        await websocket.close(code=4003, reason="Token required")
+        return
+
+    try:
+        payload = decode_access_token(token)
+    except Exception:
+        await websocket.close(code=4003, reason="Invalid or expired token")
+        return
+
+    user_id = payload.get("sub")
+
+    await websocket.accept()
+
+    async with async_session() as db:
+        session = await db.get(Session, uuid.UUID(session_id))
+        if not session:
+            await websocket.close(code=4003, reason="Session not found")
+            return
+
+        # 校验 session 所有权
+        if session.user_id != uuid.UUID(user_id):
+            await websocket.close(code=4003, reason="Session does not belong to this user")
+            return
+        # 继续处理...
+```
+
+**修正要点**：
+- 无 token 时直接关闭连接，不允许匿名
+- 认证逻辑在 `accept()` 之前执行
+- 增加 session 所有权校验，防止水平越权
+
+---
+
+### 6.4 Prompt 版本演进记录
+
+#### Prompt: "实现消息流式渲染"
+
+**V1 — 初始版本**（过于简单）：
+```
+实现 WebSocket 消息的流式渲染，消息分 chunk 到达。
+```
+
+问题：AI 不知道 chunk 的具体格式、如何处理 isFinal、以及如何合并为完整消息。
+
+**V2 — 补充协议细节**：
+```
+实现 WebSocket 消息的流式渲染。
+
+协议格式：
+- 每个 chunk 包含: { messageId, sessionId, agentId, chunkType, deltaContent, chunkIndex, isFinal }
+- chunkType 可以是: text, code_diff, web_preview, deploy_status, tool_status
+- isFinal=true 时表示消息结束
+
+要求：
+1. 按 messageId 聚合 chunks
+2. 实时追加 deltaContent 到消息体
+3. isFinal 时标记消息完成
+```
+
+改进：AI 理解了协议，但忽略了错误处理和并发场景。
+
+**V3 — 最终版本**（补充边界情况）：
+```
+实现 WebSocket 消息的流式渲染。
+
+协议格式：
+- chunk: { messageId, sessionId, agentId, chunkType, deltaContent, chunkIndex, isFinal }
+- error: { sessionId, errorCode, errorMessage, recoverable }
+- agentStatus: { sessionId, agentId, status, displayText }
+
+要求：
+1. 按 messageId 聚合 chunks，支持同一 sessionId 内多个并发消息流
+2. deltaContent 实时追加，注意处理空字符串的 isFinal（仅表示结束，无新内容）
+3. error 消息需要显示错误状态，但不覆盖正在流式输出的内容
+4. agentStatus 需要映射到 processingStatus 状态机：idle → sending → processing → streaming → idle
+5. 使用 useCallback 避免闭包陷阱，确保最新的 callback 引用
+```
+
+**演进总结**：
+
+| 版本 | 关注点 | 遗漏 |
+|------|--------|------|
+| V1 | 基本功能 | 协议格式、边界情况 |
+| V2 | 协议格式、聚合逻辑 | 错误处理、并发、状态机 |
+| V3 | 完整覆盖 | — |
+
+经验：每次迭代补充一类边界情况，直到覆盖所有真实场景。不要试图一步到位写出完美 Prompt。

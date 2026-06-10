@@ -25,6 +25,7 @@ class SendMessagePayload(BaseModel):
     session_id: UUID
     content: str = Field(min_length=1)
     reply_to_id: UUID | None = None
+    mentioned_agents: list[UUID] | None = None
 
 
 class TriggerActionPayload(BaseModel):
