@@ -79,31 +79,6 @@
           "description": "Whether the session is archived"
         },
         "lastActiveAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Last activity timestamp for sorting"
-        },
-        "lastMessagePreview": {
-          "type": "string",
-          "maxLength": 200,
-          "description": "Preview of the last message"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Creation timestamp in ISO 8601 format"
-        },
-        "isPinned": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether the session is pinned to top"
-        },
-        "isArchived": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether the session is archived"
-        },
-        "lastActiveAt": {
           "type": ["string", "null"],
           "format": "date-time",
           "description": "Last activity timestamp"
@@ -112,6 +87,11 @@
           "type": ["string", "null"],
           "maxLength": 200,
           "description": "Preview of the last message in the session"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp in ISO 8601 format"
         }
       },
       "additionalProperties": false
@@ -201,7 +181,7 @@
         },
         "contentType": {
           "type": "string",
-          "enum": ["text", "markdown", "card"],
+          "enum": ["text", "markdown", "card", "image", "file"],
           "description": "Content type classification"
         },
         "cardData": {
@@ -317,6 +297,31 @@
                     "$ref": "#/$definitions/DeployLogEntry"
                   },
                   "description": "Deployment log entries"
+                }
+              },
+              "additionalProperties": false
+            },
+            "fileAttachment": {
+              "type": "object",
+              "description": "File or image attachment metadata",
+              "required": ["url", "filename", "size", "mimeType"],
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "File download URL"
+                },
+                "filename": {
+                  "type": "string",
+                  "description": "Original filename"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "File size in bytes"
+                },
+                "mimeType": {
+                  "type": "string",
+                  "description": "MIME type of the file"
                 }
               },
               "additionalProperties": false

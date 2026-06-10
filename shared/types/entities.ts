@@ -24,8 +24,8 @@ export interface Session {
   agentIds: string[];
   isPinned?: boolean;
   isArchived?: boolean;
-  lastActiveAt?: string;
-  lastMessagePreview?: string;
+  lastActiveAt?: string | null;
+  lastMessagePreview?: string | null;
   createdAt: string;
 }
 
@@ -50,15 +50,6 @@ export interface DeployLogEntry {
   message: string;
 }
 
-export interface FileAttachment {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  url?: string;
-  thumbnailUrl?: string;
-}
-
 export interface CardData {
   codeBlock?: CodeBlock;
   diffBlock?: {
@@ -81,7 +72,12 @@ export interface CardData {
     previewUrl?: string | null;
     logs: DeployLogEntry[];
   };
-  attachments?: FileAttachment[];
+  fileAttachment?: {
+    url: string;
+    filename: string;
+    size: number;
+    mimeType: string;
+  };
 }
 
 export interface Message {
@@ -93,10 +89,6 @@ export interface Message {
   contentType: 'text' | 'markdown' | 'card' | 'image' | 'file';
   cardData?: CardData;
   createdAt: string;
+  replyToId?: string | null;
   isPinned?: boolean;
-  replyToId?: string;
-}
-
-export interface AgentHubCoreEntities {
-  [k: string]: unknown;
 }
