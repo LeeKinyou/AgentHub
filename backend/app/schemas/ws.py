@@ -25,6 +25,7 @@ class SendMessagePayload(BaseModel):
     session_id: UUID
     content: str = Field(min_length=1)
     reply_to_id: UUID | None = None
+    mentioned_agents: list[UUID] | None = None
 
 
 class TriggerActionPayload(BaseModel):
@@ -59,6 +60,20 @@ class WSPing(BaseModel):
 
     type: str = "ping"
     timestamp: str = ""
+
+
+class StopGenerationPayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    session_id: UUID
+
+
+class WSStopGeneration(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    type: str = "stopGeneration"
+    timestamp: str
+    payload: StopGenerationPayload
 
 
 # ── S2C (server-to-client) payload models ──────────────────────────────
@@ -197,6 +212,7 @@ _C2S_TYPES: dict[str, type[BaseModel]] = {
     "sendMessage": WSSendMessage,
     "triggerAction": WSTriggerAction,
     "ping": WSPing,
+    "stopGeneration": WSStopGeneration,
 }
 
 

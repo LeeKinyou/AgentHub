@@ -43,18 +43,22 @@ class CustomAdapter(BaseAdapter):
         self._mcp_manager: MCPClientManager | None = None
         self._mcp_initialized: bool = False
 
+    @property
+    def _is_openai_compatible(self) -> bool:
+        return self.api_provider in ("openai", "custom")
+
     def _get_default_key(self, settings) -> str:
-        if self.api_provider == "openai":
+        if self._is_openai_compatible:
             return settings.OPENAI_API_KEY
         return settings.ANTHROPIC_API_KEY
 
     def _get_default_model(self, settings) -> str:
-        if self.api_provider == "openai":
+        if self._is_openai_compatible:
             return settings.OPENAI_MODEL
         return settings.ANTHROPIC_MODEL
 
     def _init_client(self, settings):
-        if self.api_provider == "openai":
+        if self._is_openai_compatible:
             self.client = openai.AsyncOpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url or settings.OPENAI_BASE_URL,
@@ -152,8 +156,15 @@ All files have been created. You can open clock/index.html in a browser.
 
     def _build_tools_payload(self, mcp_tools: list[MCPTool]) -> list[dict]:
         """Merge user-defined tools with MCP-discovered tools for the active API."""
-        payload: list[dict] = list(self.tools)  # user-defined, already provider-native format
-        if self.api_provider == "openai":
+        payload: list[dict] = []
+        for tool in self.tools:
+            if self._is_openai_compatible:
+                if tool.get("type") == "function" and "function" in tool:
+                    payload.append(tool)
+            else:
+                if "name" in tool and "input_schema" in tool:
+                    payload.append(tool)
+        if self._is_openai_compatible:
             payload.extend(t.to_openai_tool() for t in mcp_tools)
         else:
             payload.extend(t.to_anthropic_tool() for t in mcp_tools)
@@ -189,7 +200,7 @@ All files have been created. You can open clock/index.html in a browser.
         mcp_tool_names = self._extract_mcp_tool_names(mcp_tools)
         max_tokens = kwargs.get("max_tokens", 4096)
 
-        if self.api_provider == "openai":
+        if self._is_openai_compatible:
             api_messages = [{"role": "system", "content": self._build_system_prompt()}]
             api_messages += [{"role": m.role, "content": m.content} for m in messages]
             async for chunk in self._loop_openai(api_messages, tools_payload, mcp_tool_names, mcp, max_tokens):
@@ -221,100 +232,96 @@ All files have been created. You can open clock/index.html in a browser.
         if tools_payload:
             call_kwargs["tools"] = tools_payload
 
-        try:
-            accumulated_blocks: list[dict] = []
-            current_text = ""
-            current_tool_input_json = ""
-            current_tool_id = ""
-            current_tool_name = ""
-            in_tool_use = False
+        accumulated_blocks: list[dict] = []
+        current_text = ""
+        current_tool_input_json = ""
+        current_tool_id = ""
+        current_tool_name = ""
+        in_tool_use = False
 
-            async with self.client.messages.stream(**call_kwargs) as stream:
-                async for event in stream:
-                    etype = getattr(event, "type", "")
+        async with self.client.messages.stream(**call_kwargs) as stream:
+            async for event in stream:
+                etype = getattr(event, "type", "")
 
-                    if etype == "content_block_start":
-                        block = getattr(event, "content_block", None)
-                        if block and getattr(block, "type", None) == "tool_use":
-                            in_tool_use = True
-                            current_tool_id = block.id
-                            current_tool_name = block.name
-                            current_tool_input_json = ""
-                        else:
-                            in_tool_use = False
-                            current_text = ""
+                if etype == "content_block_start":
+                    block = getattr(event, "content_block", None)
+                    if block and getattr(block, "type", None) == "tool_use":
+                        in_tool_use = True
+                        current_tool_id = block.id
+                        current_tool_name = block.name
+                        current_tool_input_json = ""
+                    else:
+                        in_tool_use = False
+                        current_text = ""
 
-                    elif etype == "content_block_delta":
-                        delta = getattr(event, "delta", None)
-                        if delta is None:
-                            continue
-                        dtype = getattr(delta, "type", "")
-                        if dtype == "text_delta" and not in_tool_use:
-                            text = delta.text
-                            current_text += text
-                            yield MessageChunk(chunk_type="text", content=text, is_final=False)
-                        elif dtype == "input_json_delta":
-                            current_tool_input_json += delta.partial_json  # type: ignore[attr-defined]
+                elif etype == "content_block_delta":
+                    delta = getattr(event, "delta", None)
+                    if delta is None:
+                        continue
+                    dtype = getattr(delta, "type", "")
+                    if dtype == "text_delta" and not in_tool_use:
+                        text = delta.text
+                        current_text += text
+                        yield MessageChunk(chunk_type="text", content=text, is_final=False)
+                    elif dtype == "input_json_delta":
+                        current_tool_input_json += delta.partial_json  # type: ignore[attr-defined]
 
-                    elif etype == "content_block_stop":
-                        if in_tool_use:
-                            try:
-                                tool_input = json.loads(current_tool_input_json) if current_tool_input_json else {}
-                            except json.JSONDecodeError:
-                                tool_input = {}
-                            accumulated_blocks.append({
-                                "type": "tool_use",
-                                "id": current_tool_id,
-                                "name": current_tool_name,
-                                "input": tool_input,
-                            })
-                            in_tool_use = False
-                        else:
-                            if current_text:
-                                accumulated_blocks.append({"type": "text", "text": current_text})
+                elif etype == "content_block_stop":
+                    if in_tool_use:
+                        try:
+                            tool_input = json.loads(current_tool_input_json) if current_tool_input_json else {}
+                        except json.JSONDecodeError:
+                            tool_input = {}
+                        accumulated_blocks.append({
+                            "type": "tool_use",
+                            "id": current_tool_id,
+                            "name": current_tool_name,
+                            "input": tool_input,
+                        })
+                        in_tool_use = False
+                    else:
+                        if current_text:
+                            accumulated_blocks.append({"type": "text", "text": current_text})
 
-            # check for tool calls
-            tool_use_blocks = [b for b in accumulated_blocks if b.get("type") == "tool_use"]
-            if not tool_use_blocks:
-                yield MessageChunk(chunk_type="text", content="", is_final=True)
-                return
+        # check for tool calls
+        tool_use_blocks = [b for b in accumulated_blocks if b.get("type") == "tool_use"]
+        if not tool_use_blocks:
+            yield MessageChunk(chunk_type="text", content="", is_final=True)
+            return
 
-            if round_num >= MAX_TOOL_ROUNDS:
-                yield MessageChunk(
-                    chunk_type="text",
-                    content=f"\n[Stopped: exceeded maximum of {MAX_TOOL_ROUNDS} tool-call rounds]",
-                    is_final=True,
-                )
-                return
+        if round_num >= MAX_TOOL_ROUNDS:
+            yield MessageChunk(
+                chunk_type="text",
+                content=f"\n[Stopped: exceeded maximum of {MAX_TOOL_ROUNDS} tool-call rounds]",
+                is_final=True,
+            )
+            return
 
-            # execute tools and build continuation
-            new_messages = list(api_messages)
-            new_messages.append({"role": "assistant", "content": accumulated_blocks})
+        # execute tools and build continuation
+        new_messages = list(api_messages)
+        new_messages.append({"role": "assistant", "content": accumulated_blocks})
 
-            tool_results: list[dict] = []
-            for block in tool_use_blocks:
-                result_text, is_error = await self._execute_tool(
-                    block["name"], block["input"], mcp_tool_names, mcp,
-                )
-                yield MessageChunk(
-                    chunk_type="tool_status",
-                    content=json.dumps({"tool": block["name"], "done": True, "isError": is_error}, ensure_ascii=False),
-                    is_final=False,
-                )
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block["id"],
-                    "content": result_text,
-                    **({"is_error": True} if is_error else {}),
-                })
+        tool_results: list[dict] = []
+        for block in tool_use_blocks:
+            result_text, is_error = await self._execute_tool(
+                block["name"], block["input"], mcp_tool_names, mcp,
+            )
+            yield MessageChunk(
+                chunk_type="tool_status",
+                content=json.dumps({"tool": block["name"], "done": True, "isError": is_error}, ensure_ascii=False),
+                is_final=False,
+            )
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": block["id"],
+                "content": result_text,
+                **({"is_error": True} if is_error else {}),
+            })
 
-            new_messages.append({"role": "user", "content": tool_results})
+        new_messages.append({"role": "user", "content": tool_results})
 
-            async for chunk in self._loop_anthropic(new_messages, tools_payload, mcp_tool_names, mcp, max_tokens, round_num + 1):
-                yield chunk
-
-        except Exception as e:
-            yield MessageChunk(chunk_type="text", content=f"[CustomAdapter] Error: {e}", is_final=True)
+        async for chunk in self._loop_anthropic(new_messages, tools_payload, mcp_tool_names, mcp, max_tokens, round_num + 1):
+            yield chunk
 
     # ------------------------------------------------------------------ #
     #  OpenAI tool-call loop                                               #
@@ -338,85 +345,81 @@ All files have been created. You can open clock/index.html in a browser.
         if tools_payload:
             call_kwargs["tools"] = tools_payload
 
-        try:
-            stream = await self.client.chat.completions.create(**call_kwargs)
+        stream = await self.client.chat.completions.create(**call_kwargs)
 
-            tool_calls_map: dict[int, dict] = {}
-            text_buf = ""
+        tool_calls_map: dict[int, dict] = {}
+        text_buf = ""
 
-            async for chunk in stream:
-                delta = chunk.choices[0].delta if chunk.choices else None
-                if delta is None:
-                    continue
-                if delta.content:
-                    text_buf += delta.content
-                    yield MessageChunk(chunk_type="text", content=delta.content, is_final=False)
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        idx = tc.index
-                        if idx not in tool_calls_map:
-                            tool_calls_map[idx] = {"id": "", "name": "", "arguments_buf": ""}
-                        entry = tool_calls_map[idx]
-                        if tc.id:
-                            entry["id"] = tc.id
-                        if tc.function:
-                            if tc.function.name:
-                                entry["name"] = tc.function.name
-                            if tc.function.arguments:
-                                entry["arguments_buf"] += tc.function.arguments
+        async for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta is None:
+                continue
+            if delta.content:
+                text_buf += delta.content
+                yield MessageChunk(chunk_type="text", content=delta.content, is_final=False)
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in tool_calls_map:
+                        tool_calls_map[idx] = {"id": "", "name": "", "arguments_buf": ""}
+                    entry = tool_calls_map[idx]
+                    if tc.id:
+                        entry["id"] = tc.id
+                    if tc.function:
+                        if tc.function.name:
+                            entry["name"] = tc.function.name
+                        if tc.function.arguments:
+                            entry["arguments_buf"] += tc.function.arguments
 
-            if not tool_calls_map:
-                yield MessageChunk(chunk_type="text", content="", is_final=True)
-                return
+        if not tool_calls_map:
+            yield MessageChunk(chunk_type="text", content="", is_final=True)
+            return
 
-            if round_num >= MAX_TOOL_ROUNDS:
-                yield MessageChunk(
-                    chunk_type="text",
-                    content=f"\n[Stopped: exceeded maximum of {MAX_TOOL_ROUNDS} tool-call rounds]",
-                    is_final=True,
-                )
-                return
+        if round_num >= MAX_TOOL_ROUNDS:
+            yield MessageChunk(
+                chunk_type="text",
+                content=f"\n[Stopped: exceeded maximum of {MAX_TOOL_ROUNDS} tool-call rounds]",
+                is_final=True,
+            )
+            return
 
-            sorted_calls = [tool_calls_map[i] for i in sorted(tool_calls_map.keys())]
+        sorted_calls = [tool_calls_map[i] for i in sorted(tool_calls_map.keys())]
 
-            # build assistant message with tool_calls
-            assistant_tool_calls = [
-                {"id": tc["id"], "type": "function", "function": {"name": tc["name"], "arguments": tc["arguments_buf"]}}
-                for tc in sorted_calls
-            ]
-            assistant_msg: dict = {"role": "assistant", "tool_calls": assistant_tool_calls}
-            if text_buf:
-                assistant_msg["content"] = text_buf
+        # build assistant message with tool_calls
+        assistant_tool_calls = [
+            {"id": tc["id"], "type": "function", "function": {"name": tc["name"], "arguments": tc["arguments_buf"]}}
+            for tc in sorted_calls
+        ]
+        assistant_msg: dict = {"role": "assistant", "tool_calls": assistant_tool_calls}
+        if text_buf:
+            assistant_msg["content"] = text_buf
 
-            new_messages = list(api_messages)
-            new_messages.append(assistant_msg)
+        new_messages = list(api_messages)
+        new_messages.append(assistant_msg)
 
-            # execute each tool
-            for tc in sorted_calls:
-                try:
-                    tool_args = json.loads(tc["arguments_buf"]) if tc["arguments_buf"] else {}
-                except json.JSONDecodeError:
-                    tool_args = {}
+        # execute each tool
+        for tc in sorted_calls:
+            try:
+                tool_args = json.loads(tc["arguments_buf"]) if tc["arguments_buf"] else {}
+            except json.JSONDecodeError:
+                tool_args = {}
 
-                result_text, is_error = await self._execute_tool(
-                    tc["name"], tool_args, mcp_tool_names, mcp,
-                )
-                yield MessageChunk(
-                    chunk_type="tool_status",
-                    content=json.dumps({"tool": tc["name"], "done": True, "isError": is_error}, ensure_ascii=False),
-                    is_final=False,
-                )
-                new_messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": result_text,
-                })
+            result_text, is_error = await self._execute_tool(
+                tc["name"], tool_args, mcp_tool_names, mcp,
+            )
+            yield MessageChunk(
+                chunk_type="tool_status",
+                content=json.dumps({"tool": tc["name"], "done": True, "isError": is_error}, ensure_ascii=False),
+                is_final=False,
+            )
+            new_messages.append({
+                "role": "tool",
+                "tool_call_id": tc["id"],
+                "content": result_text,
+            })
 
-            async for chunk in self._loop_openai(new_messages, tools_payload, mcp_tool_names, mcp, max_tokens, round_num + 1):
-                yield chunk
-
-        except Exception as e:
-            yield MessageChunk(chunk_type="text", content=f"[CustomAdapter] Error: {e}", is_final=True)
+        async for chunk in self._loop_openai(new_messages, tools_payload, mcp_tool_names, mcp, max_tokens, round_num + 1):
+            yield chunk
 
     # ------------------------------------------------------------------ #
     #  Shared tool execution                                                #

@@ -30,14 +30,14 @@ function getFileIcon(path: string): string {
 
 function getActionLabel(action: string): { label: string; color: string } {
   switch (action) {
-    case 'create': return { label: '新建', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' };
+    case 'create': return { label: '新建', color: 'text-minimal-success bg-minimal-success/10 border-minimal-success/20' };
     case 'modify':
     case 'edit':
     case 'update':
-    case 'write': return { label: '修改', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' };
+    case 'write': return { label: '修改', color: 'text-minimal-warning bg-minimal-warning/10 border-minimal-warning/20' };
     case 'delete':
-    case 'remove': return { label: '删除', color: 'text-red-400 bg-red-500/10 border-red-500/30' };
-    default: return { label: action ?? '未知', color: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30' };
+    case 'remove': return { label: '删除', color: 'text-minimal-error bg-minimal-error/10 border-minimal-error/20' };
+    default: return { label: action ?? '未知', color: 'text-minimal-secondary bg-minimal-bg border-minimal-border' };
   }
 }
 
@@ -59,12 +59,12 @@ function DiffPreview({ oldContent, newContent }: { oldContent: string; newConten
   if (maxLines > 20) preview.push({ type: 'normal', content: `... 还有 ${maxLines - 20} 行` });
 
   return (
-    <pre className="mt-2 p-2 rounded bg-zinc-900 border border-zinc-700 text-[11px] leading-relaxed overflow-x-auto max-h-40 overflow-y-auto">
+    <pre className="mt-2 p-2 rounded-minimal bg-minimal-text dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border text-[11px] leading-relaxed overflow-x-auto max-h-40 overflow-y-auto">
       {preview.map((line, i) => (
         <div key={i} className={
-          line.type === 'added' ? 'text-emerald-400 bg-emerald-500/5' :
-          line.type === 'removed' ? 'text-red-400 bg-red-500/5' :
-          'text-zinc-500'
+          line.type === 'added' ? 'text-minimal-success bg-minimal-success/5' :
+          line.type === 'removed' ? 'text-minimal-error bg-minimal-error/5' :
+          'text-white/50'
         }>
           <span className="inline-block w-4 text-center mr-2">
             {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
@@ -95,14 +95,14 @@ export function FileOperationDialog({ operations, onApprove, onApproveAll, onRej
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onReject}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-[480px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onReject}>
+      <div className="bg-minimal-glass/80 dark:bg-minimal-dark-surface/80 backdrop-blur-xl border border-minimal-glass-border dark:border-minimal-dark-border rounded-minimal shadow-minimal-glass w-[480px] max-h-[80vh] flex flex-col shadow-minimal-glow" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-800">
-          <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-lg">📁</div>
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-minimal-glass-border dark:border-minimal-dark-border">
+          <div className="w-10 h-10 rounded-minimal bg-minimal-accent/10 border border-minimal-accent/20 flex items-center justify-center text-lg">📁</div>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-100">文件操作请求</h3>
-            <p className="text-[11px] text-zinc-500">Agent 请求对 {operations.length} 个文件进行操作，请审查后确认</p>
+            <h3 className="text-sm font-semibold text-minimal-text dark:text-minimal-dark-text">文件操作请求</h3>
+            <p className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary">Agent 请求对 {operations.length} 个文件进行操作，请审查后确认</p>
           </div>
         </div>
 
@@ -112,27 +112,27 @@ export function FileOperationDialog({ operations, onApprove, onApproveAll, onRej
             const { label, color } = getActionLabel(op.action);
             const isExpanded = expandedIdx === idx;
             return (
-              <div key={idx} className="rounded-lg border border-zinc-800 bg-zinc-800/30 overflow-hidden">
+              <div key={idx} className="rounded-minimal border border-minimal-border dark:border-minimal-dark-border overflow-hidden">
                 <div className="flex items-center gap-3 px-3 py-2.5">
                   <input
                     type="checkbox"
                     checked={selectedOps.has(idx)}
                     onChange={() => toggleOp(idx)}
-                    className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0"
+                    className="w-4 h-4 rounded border-minimal-border text-minimal-accent focus:ring-minimal-accent focus:ring-offset-0"
                   />
                   <span className="text-sm">{getFileIcon(op.path)}</span>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs text-zinc-200 font-mono truncate block">{op.path}</span>
+                    <span className="text-xs text-minimal-text dark:text-minimal-dark-text font-mono truncate block">{op.path}</span>
                   </div>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full border ${color}`}>{label}</span>
-                  <button onClick={() => setExpandedIdx(isExpanded ? null : idx)} className="text-zinc-500 hover:text-zinc-300 transition-colors">
+                  <button onClick={() => setExpandedIdx(isExpanded ? null : idx)} className="text-minimal-tertiary dark:text-minimal-dark-tertiary hover:text-minimal-text dark:hover:text-minimal-dark-text transition-colors duration-300">
                     <span className="text-xs">{isExpanded ? '▲' : '▼'}</span>
                   </button>
                 </div>
                 {isExpanded && (
-                  <div className="px-3 pb-3 border-t border-zinc-800">
+                  <div className="px-3 pb-3 border-t border-minimal-border dark:border-minimal-dark-border">
                     {(op.action === 'create') && op.content && (
-                      <pre className="mt-2 p-2 rounded bg-zinc-900 border border-zinc-700 text-[11px] text-emerald-300 leading-relaxed overflow-x-auto max-h-40 overflow-y-auto">
+                      <pre className="mt-2 p-2 rounded-minimal bg-minimal-text dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border text-[11px] text-minimal-success leading-relaxed overflow-x-auto max-h-40 overflow-y-auto">
                         {op.content.slice(0, 1000)}{op.content.length > 1000 ? '\n...' : ''}
                       </pre>
                     )}
@@ -140,12 +140,12 @@ export function FileOperationDialog({ operations, onApprove, onApproveAll, onRej
                       <DiffPreview oldContent={op.oldContent} newContent={op.newContent} />
                     )}
                     {['modify', 'edit', 'update', 'write'].includes(op.action) && !op.oldContent && op.newContent && (
-                      <pre className="mt-2 p-2 rounded bg-zinc-900 border border-zinc-700 text-[11px] text-amber-300 leading-relaxed overflow-x-auto max-h-40 overflow-y-auto">
+                      <pre className="mt-2 p-2 rounded-minimal bg-minimal-text dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border text-[11px] text-minimal-warning leading-relaxed overflow-x-auto max-h-40 overflow-y-auto">
                         {op.newContent.slice(0, 1000)}{op.newContent.length > 1000 ? '\n...' : ''}
                       </pre>
                     )}
                     {['delete', 'remove'].includes(op.action) && (
-                      <p className="mt-2 text-xs text-red-400">⚠️ 此操作将删除该文件，不可撤销</p>
+                      <p className="mt-2 text-xs text-minimal-error">此操作将删除该文件，不可撤销</p>
                     )}
                   </div>
                 )}
@@ -155,24 +155,24 @@ export function FileOperationDialog({ operations, onApprove, onApproveAll, onRej
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-zinc-800 bg-zinc-900/50">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-minimal-border dark:border-minimal-dark-border bg-minimal-bg dark:bg-minimal-dark-bg">
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0" />
-              <span className="text-[11px] text-zinc-500">记住选择</span>
+                className="w-3.5 h-3.5 rounded border-minimal-border text-minimal-accent focus:ring-minimal-accent focus:ring-offset-0" />
+              <span className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary">记住选择</span>
             </label>
           </div>
           <div className="flex gap-2">
-            <button onClick={onReject} className="px-4 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-lg hover:bg-zinc-800 transition-colors">
+            <button onClick={onReject} className="px-4 py-1.5 text-xs font-medium text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text border border-minimal-border dark:border-minimal-dark-border rounded-minimal hover:bg-white dark:hover:bg-minimal-dark-surface transition-colors duration-300">
               拒绝全部
             </button>
             <button onClick={handleApprove} disabled={selectedOps.size === 0}
-              className="px-4 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              className="px-4 py-1.5 text-xs font-medium text-white bg-minimal-accent hover:bg-minimal-accent-hover rounded-minimal transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
               确认应用 ({selectedOps.size})
             </button>
             <button onClick={() => onApproveAll(operations, remember)}
-              className="px-4 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors">
+              className="px-4 py-1.5 text-xs font-medium text-white bg-minimal-success hover:bg-minimal-success/90 rounded-minimal transition-colors duration-300">
               {remember ? '始终信任并全部应用' : '一键全部应用'}
             </button>
           </div>

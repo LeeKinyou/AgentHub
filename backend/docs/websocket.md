@@ -156,10 +156,23 @@ Agent 状态变更通知。当 Agent 在不同状态之间切换时发送。
 
 **Agent 状态生命周期：**
 
+持久化状态（写入 `agent_profiles.status`）：
+
 ```
-offline --> busy (收到消息时)
-busy --> online (成功时)
-busy --> error (失败时)
+offline --> busy   (用户发送消息时)
+busy    --> online (Agent 成功完成时)
+busy    --> error  (Agent 执行失败时)
+busy    --> online (WebSocket 断开时清理)
+error   --> online (WebSocket 断开时清理)
+```
+
+瞬时状态（仅通过 WebSocket 传输，不写 DB，用于 UI 展示）：
+
+```
+analyzing   -- Agent 正在分析任务（规划阶段或步骤分析）
+executing   -- Agent 正在生成输出
+completed   -- Agent 完成（触发 DB 更新为 online）
+failed      -- Agent 失败（触发 DB 更新为 error）
 ```
 
 WebSocket 断开连接后，会话中所有处于 `busy`/`error` 状态的 Agent 会被重置为 `online`。

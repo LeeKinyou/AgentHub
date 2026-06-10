@@ -1,6 +1,6 @@
 'use client';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 const API_PREFIX = '/api';
 
 interface ApiResponse<T = unknown> {
@@ -10,9 +10,9 @@ interface ApiResponse<T = unknown> {
 }
 
 export interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
   user: UserRead;
 }
 
@@ -60,6 +60,10 @@ interface SessionRead {
   title: string;
   type: 'single' | 'group';
   agentIds: string[];
+  isPinned?: boolean;
+  isArchived?: boolean;
+  lastActiveAt?: string;
+  lastMessagePreview?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -189,13 +193,13 @@ class ApiClient {
       const response = await fetch(`${API_BASE}${API_PREFIX}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: this.refreshToken }),
+        body: JSON.stringify({ refreshToken: this.refreshToken }),
       });
 
       if (response.ok) {
         const result: ApiResponse<TokenResponse> = await response.json();
         if (result.data) {
-          this.setTokens(result.data.access_token, result.data.refresh_token);
+          this.setTokens(result.data.accessToken, result.data.refreshToken);
           return true;
         }
       }
@@ -214,7 +218,7 @@ class ApiClient {
       body: JSON.stringify({ username, email, password }),
     });
     if (result.data) {
-      this.setTokens(result.data.access_token, result.data.refresh_token);
+      this.setTokens(result.data.accessToken, result.data.refreshToken);
     }
     return result;
   }
@@ -225,7 +229,7 @@ class ApiClient {
       body: JSON.stringify({ username, password }),
     });
     if (result.data) {
-      this.setTokens(result.data.access_token, result.data.refresh_token);
+      this.setTokens(result.data.accessToken, result.data.refreshToken);
     }
     return result;
   }
@@ -305,10 +309,14 @@ class ApiClient {
     return this.request<SessionRead>(`/users/${userId}/sessions/${sessionId}`);
   }
 
-  async updateSession(userId: string, sessionId: string, data: { title?: string }): Promise<ApiResponse<SessionRead>> {
+  async updateSession(userId: string, sessionId: string, data: { title?: string; isPinned?: boolean; isArchived?: boolean }): Promise<ApiResponse<SessionRead>> {
     return this.request<SessionRead>(`/users/${userId}/sessions/${sessionId}`, {
       method: 'PATCH',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.isPinned !== undefined && { is_pinned: data.isPinned }),
+        ...(data.isArchived !== undefined && { is_archived: data.isArchived }),
+      }),
     });
   }
 
@@ -340,6 +348,26 @@ class ApiClient {
   async listDeploys(sessionId?: string): Promise<ApiResponse<Array<{ deployId: string; status: string; url: string | null; createdAt: string }>>> {
     const query = sessionId ? `?session_id=${sessionId}` : '';
     return this.request(`/deploy${query}`);
+  }
+
+  // Upload
+  async uploadFile(file: File): Promise<ApiResponse<{ url: string; filename: string; size: number; mimeType: string }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+    try {
+      const response = await fetch(`${API_BASE}${API_PREFIX}/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+      return this.parseResponse(response);
+    } catch {
+      return { code: 0, data: null, message: '文件上传失败' };
+    }
   }
 }
 

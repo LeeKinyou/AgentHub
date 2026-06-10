@@ -14,7 +14,7 @@ interface UseWebSocketOptions {
   onLog: (type: LogItem['type'], source: string, message: string) => void;
 }
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8001/ws';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8000/ws';
 const RECONNECT_BASE_DELAY = 2000;
 const RECONNECT_MAX_DELAY = 30000;
 const PING_INTERVAL = 30000;
@@ -120,17 +120,20 @@ export function useWebSocket({ sessionId, onChunk, onMessageComplete, onAgentSta
     return cleanup;
   }, [sessionId, connect, cleanup]);
 
-  const sendMessage = useCallback((content: string): boolean => {
+  const sendMessage = useCallback((content: string, replyToId?: string, mentionedAgents?: string[]): boolean => {
     if (wsRef.current?.readyState !== WebSocket.OPEN || !sessionIdRef.current) {
       // Queue for resend on reconnect (Bug #7)
       pendingMessagesRef.current.push({ content, timestamp: new Date().toISOString() });
       return false;
     }
     const timestamp = new Date().toISOString();
+    const payload: Record<string, unknown> = { sessionId: sessionIdRef.current, content };
+    if (replyToId) payload.replyToId = replyToId;
+    if (mentionedAgents && mentionedAgents.length > 0) payload.mentionedAgents = mentionedAgents;
     wsRef.current.send(JSON.stringify({
       type: 'sendMessage',
       timestamp,
-      payload: { sessionId: sessionIdRef.current, content },
+      payload,
     }));
     return true;
   }, []);

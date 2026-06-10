@@ -7,6 +7,19 @@
 /**
  * SSOT contract for bidirectional WebSocket communication protocol
  */
+export type WSMessage =
+  | C2SPing
+  | C2SSendMessage
+  | C2STriggerAction
+  | S2CPong
+  | S2CAgentStatus
+  | S2CMessageChunk
+  | S2CMessageComplete
+  | S2CError
+  | S2CActionStatus
+  | S2CActionResult;
+
+/** @deprecated Use WSMessage instead */
 export type AgentHubWebSocketMessages =
   | C2SPing
   | C2SSendMessage
@@ -15,9 +28,9 @@ export type AgentHubWebSocketMessages =
   | S2CAgentStatus
   | S2CMessageChunk
   | S2CMessageComplete
-  | S2CError;
-
-export type WSMessage = AgentHubWebSocketMessages;
+  | S2CError
+  | S2CActionStatus
+  | S2CActionResult;
 
 export interface C2SPing {
   /**
@@ -47,6 +60,10 @@ export interface C2SSendMessage {
      * User message content
      */
     content: string;
+    /**
+     * Optional ID of the message being replied to
+     */
+    replyToId?: string;
   };
 }
 export interface C2STriggerAction {
@@ -138,7 +155,7 @@ export interface S2CMessageChunk {
     /**
      * Content type for frontend rendering dispatch
      */
-    chunkType: "text" | "code_diff" | "web_preview" | "deploy_status";
+    chunkType: "text" | "code_diff" | "web_preview" | "deploy_status" | "tool_status";
     /**
      * Incremental text content for this chunk
      */
@@ -191,7 +208,7 @@ export interface Message {
   /**
    * Content type classification
    */
-  contentType: "text" | "markdown" | "card";
+  contentType: "text" | "markdown" | "card" | "image" | "file";
   /**
    * Structured artifact data, required when contentType is 'card'
    */
@@ -284,15 +301,44 @@ export interface Message {
        */
       logs: DeployLogEntry[];
     };
+    /**
+     * File or image attachment metadata
+     */
+    fileAttachment?: {
+      /**
+       * File download URL
+       */
+      url: string;
+      /**
+       * Original filename
+       */
+      filename: string;
+      /**
+       * File size in bytes
+       */
+      size: number;
+      /**
+       * MIME type of the file
+       */
+      mimeType: string;
+    };
   };
   /**
    * Creation timestamp in ISO 8601 format
    */
   createdAt: string;
+  /**
+   * ID of the message being replied to
+   */
+  replyToId?: string | null;
+  /**
+   * Whether the message is pinned
+   */
+  isPinned?: boolean;
 }
 export interface DiffHunk {
   /**
-   * Starting line number in the original file
+   * Starting line number in the original file (0 for new file creation)
    */
   oldStart: number;
   /**
@@ -356,5 +402,65 @@ export interface S2CError {
      * Whether client can retry the operation
      */
     recoverable: boolean;
+  };
+}
+export interface S2CActionStatus {
+  /**
+   * Message type discriminator
+   */
+  type: "actionStatus";
+  /**
+   * Server push timestamp in ISO 8601
+   */
+  timestamp: string;
+  payload: {
+    /**
+     * Session context
+     */
+    sessionId: string;
+    /**
+     * Target message ID
+     */
+    messageId: string;
+    /**
+     * Action being executed
+     */
+    actionType: "applyDiff" | "retry" | "pin";
+    /**
+     * Current action execution status
+     */
+    status: "applying" | "pending";
+  };
+}
+export interface S2CActionResult {
+  /**
+   * Message type discriminator
+   */
+  type: "actionResult";
+  /**
+   * Server push timestamp in ISO 8601
+   */
+  timestamp: string;
+  payload: {
+    /**
+     * Session context
+     */
+    sessionId: string;
+    /**
+     * Target message ID
+     */
+    messageId: string;
+    /**
+     * Action that was executed
+     */
+    actionType: "applyDiff" | "retry" | "pin";
+    /**
+     * Final action result status
+     */
+    status: "applied" | "rejected" | "failed";
+    /**
+     * Human-readable result detail
+     */
+    detail: string;
   };
 }

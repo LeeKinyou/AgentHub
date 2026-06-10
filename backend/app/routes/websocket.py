@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -39,6 +40,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["websocket"])
 
+_MENTION_RE = re.compile(r"@(\w+)")
+
+
+def parse_mentioned_agents(content: str, roster: list[AgentDescriptor]) -> list[AgentDescriptor]:
+    """Extract @AgentName mentions from content and return matching agents in roster order."""
+    mentioned_names = set(_MENTION_RE.findall(content))
+    if not mentioned_names:
+        return []
+    name_map = {a.name.lower(): a for a in roster}
+    matched = [name_map[name.lower()] for name in mentioned_names if name.lower() in name_map]
+    return matched
+
 
 class WebSocketSessionGuard:
     """Per-connection concurrency control and rate limiting."""
@@ -47,6 +60,7 @@ class WebSocketSessionGuard:
         self._lock = asyncio.Lock()
         self._min_interval = min_interval_seconds
         self._last_send_time: float = 0.0
+        self._cancel_event = asyncio.Event()
 
     @asynccontextmanager
     async def message_lock(self):
@@ -66,6 +80,18 @@ class WebSocketSessionGuard:
 
     def record_send_time(self) -> None:
         self._last_send_time = time.monotonic()
+
+    def request_cancel(self) -> None:
+        """Signal that the current generation should be cancelled."""
+        self._cancel_event.set()
+
+    def is_cancelled(self) -> bool:
+        """Check if cancellation has been requested."""
+        return self._cancel_event.is_set()
+
+    def reset_cancel(self) -> None:
+        """Reset the cancellation flag for a new message."""
+        self._cancel_event.clear()
 
 
 async def build_conversation_history(
@@ -137,6 +163,7 @@ async def _handle_send_message(
         return
 
     content = payload.get("content", "")
+    raw_mentioned = payload.get("mentionedAgents") or []
     raw_reply_to_id = payload.get("replyToId")
     reply_to_id = None
     if raw_reply_to_id:
@@ -176,14 +203,30 @@ async def _handle_send_message(
         await db.commit()
 
         full_content = ""
-        primary_agent_id = agent_roster[0].agent_id if agent_roster else ""
+        primary_agent_id = effective_roster[0].agent_id if effective_roster else ""
 
         conversation_history = await build_conversation_history(
             db, session_uuid, limit=20, exclude_id=user_msg.id
         )
 
+        # @mention routing: reorder roster to prioritize mentioned agents
+        effective_roster = list(agent_roster)
+        mentioned_by_id = [a for a in agent_roster if a.agent_id in raw_mentioned]
+        mentioned_by_name = parse_mentioned_agents(content, agent_roster)
+        # Merge: ID-based mentions first (from frontend context items), then name-based
+        seen_ids: set[str] = set()
+        prioritized: list[AgentDescriptor] = []
+        for a in mentioned_by_id + mentioned_by_name:
+            if a.agent_id not in seen_ids:
+                prioritized.append(a)
+                seen_ids.add(a.agent_id)
+        if prioritized:
+            remaining = [a for a in agent_roster if a.agent_id not in seen_ids]
+            effective_roster = prioritized + remaining
+            logger.info("Agent routing: prioritizing %s for session %s", [a.name for a in prioritized], session_id)
+
         # Mark participating agents as busy
-        agent_uuids = [uuid.UUID(a.agent_id) for a in agent_roster if a.agent_id]
+        agent_uuids = [uuid.UUID(a.agent_id) for a in effective_roster if a.agent_id]
         if agent_uuids:
             await db.execute(
                 update(AgentProfile)
@@ -193,7 +236,23 @@ async def _handle_send_message(
             await db.commit()
 
         try:
-            async for event in orchestrator.process(session_id, content, agent_roster, conversation_history=conversation_history):
+            guard.reset_cancel()
+            async for event in orchestrator.process(session_id, content, effective_roster, conversation_history=conversation_history):
+                if guard.is_cancelled():
+                    logger.info("Generation cancelled for session %s", session_id)
+                    await websocket.send_json(S2CMessageChunk(
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        payload=MessageChunkPayload(
+                            message_id=response_message_id,
+                            session_id=session_id,
+                            agent_id=primary_agent_id,
+                            chunk_type="text",
+                            delta_content="\n\n[生成已取消]",
+                            chunk_index=0,
+                            is_final=True,
+                        ),
+                    ).model_dump(mode="json", by_alias=True))
+                    break
                 if isinstance(event, AgentStatusEvent):
                     # Update agent status in DB on terminal states
                     if event.status in ("completed", "failed"):
@@ -479,6 +538,11 @@ async def websocket_endpoint(
                 msg_type = data.get("type")
 
                 if msg_type == "ping":
+                    await websocket.send_json(S2CPong(timestamp=data.get("timestamp", "")).model_dump(mode="json", by_alias=True))
+
+                elif msg_type == "stopGeneration":
+                    logger.info("Stop generation requested for session %s", session_id)
+                    guard.request_cancel()
                     await websocket.send_json(S2CPong(timestamp=data.get("timestamp", "")).model_dump(mode="json", by_alias=True))
 
                 elif msg_type == "sendMessage":

@@ -1,6 +1,6 @@
 # models/ - 数据库模型
 
-SQLAlchemy ORM 模型定义，使用 PostgreSQL 特有类型 (UUID, JSONB, ARRAY)。
+SQLAlchemy ORM 模型定义，使用 PostgreSQL 特有类型 (UUID, ARRAY) 和通用 JSON 类型。
 
 所有模型使用 UUID7 作为主键 (`uuid6.uuid7`)，提供时间有序的唯一标识符。
 
@@ -27,8 +27,8 @@ SQLAlchemy ORM 模型定义，使用 PostgreSQL 特有类型 (UUID, JSONB, ARRAY
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | `id` | UUID | PK, default=uuid7 | 用户唯一标识 |
-| `username` | String(100) | UNIQUE, NOT NULL | 用户名 |
-| `email` | String(255) | UNIQUE, NULLABLE | 邮箱 |
+| `username` | String(50) | UNIQUE, NOT NULL | 用户名 |
+| `email` | String(255) | UNIQUE, NOT NULL | 邮箱 |
 | `password_hash` | String(128) | NOT NULL | 密码哈希 (bcrypt) |
 | `avatar` | String(512) | NULLABLE | 头像 URL |
 | `created_at` | DateTime(tz) | server_default=now() | 创建时间 |
@@ -64,12 +64,13 @@ class User(Base):
 | `adapter_type` | String(50) | NOT NULL, default="claude_code" | 适配器类型 |
 | `description` | Text | NULLABLE | 智能体描述 |
 | `system_prompt` | Text | NULLABLE | 系统提示词 |
-| `agent_config` | JSONB | NULLABLE | 适配器配置 (tools, skills, mcp_servers) |
+| `agent_config` | JSON | NULLABLE | 适配器配置 (tools, skills, mcp_servers) |
+| `status` | String(20) | NOT NULL, default="offline" | 状态: `online` / `offline` / `busy` / `error` |
 | `created_at` | DateTime(tz) | server_default=now() | 创建时间 |
 
 ### 表名: `agent_profiles`
 
-### agent_config JSONB 结构
+### agent_config JSON 结构
 
 ```json
 {
@@ -143,7 +144,7 @@ class User(Base):
 | `sender_id` | String(255) | NOT NULL | 发送者 ID |
 | `content` | Text | NOT NULL, default="" | 消息文本内容 |
 | `content_type` | String(20) | NOT NULL, default="text" | 内容类型 |
-| `card_data` | JSONB | NULLABLE | 富内容卡片数据 |
+| `card_data` | JSON | NULLABLE | 富内容卡片数据 |
 | `reply_to_id` | UUID | FK(messages.id), SET NULL, NULLABLE | 回复目标消息 ID (自引用) |
 | `is_pinned` | Boolean | NOT NULL, default=False | 是否置顶 |
 | `created_at` | DateTime(tz) | server_default=now() | 创建时间 |
@@ -164,7 +165,7 @@ class User(Base):
 | `markdown` | Markdown 格式 |
 | `card` | 富内容卡片 (代码块、Diff、预览等) |
 
-### card_data JSONB 结构
+### card_data JSON 结构
 
 `card_data` 根据 `content_type` 包含不同结构:
 

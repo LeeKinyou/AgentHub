@@ -142,3 +142,441 @@
    - 依赖：前置任务编号
    - 产出：预期交付物
 ```
+
+---
+
+## 五、人机协作深度场景
+
+### 5.1 Orchestrator 任务规划 Prompt
+
+**场景**：用户在群聊中输入复杂需求，Orchestrator 需要拆解为多 Agent 协作计划。
+
+**人类输入**：
+```
+我需要为这个项目添加用户认证功能，包括注册、登录、JWT token 管理，
+以及中间件保护路由。请规划执行方案。
+
+可用 Agent 名册：
+- Claude (expert): 擅长代码生成与架构设计
+- Codex (expert): 擅长代码补全与重构
+- SecurityBot (expert): 擅长安全审计与漏洞检测
+```
+
+**AI 输出摘要**：
+```json
+{
+  "plan": "用户认证系统实现",
+  "steps": [
+    {
+      "id": 1,
+      "agent": "Claude",
+      "task": "设计 User 模型和认证 Schema",
+      "output": "models/user.py, schemas/auth.py",
+      "dependencies": []
+    },
+    {
+      "id": 2,
+      "agent": "Claude",
+      "task": "实现 JWT encode/decode + bcrypt 密码哈希",
+      "output": "core/security.py",
+      "dependencies": [1]
+    },
+    {
+      "id": 3,
+      "agent": "Codex",
+      "task": "实现认证路由 register/login/refresh/logout",
+      "output": "routes/auth.py",
+      "dependencies": [1, 2]
+    },
+    {
+      "id": 4,
+      "agent": "SecurityBot",
+      "task": "审查认证实现的安全性",
+      "output": "安全审查报告",
+      "dependencies": [3]
+    }
+  ]
+}
+```
+
+**人机迭代**：
+- 人类审查：建议将 SecurityBot 审查提前到路由实现之前，避免返工
+- AI 调整：重新编排依赖图，让 SecurityBot 在 step 2 完成后即审查 core/security.py
+- 人类确认：执行调整后的计划
+
+### 5.2 安全审查 Prompt
+
+**场景**：让 AI 审查 WebSocket 路由代码中的安全漏洞。
+
+**人类输入**：
+```
+请审查以下 WebSocket 路由代码的安全性，重点关注：
+1. 认证与授权
+2. 输入校验
+3. Rate limiting
+4. 资源消耗防护
+
+代码路径：backend/app/routes/websocket.py
+
+```python
+@router.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    await websocket.accept()
+    # ... 处理消息
+```
+```
+
+**AI 输出摘要**：
+发现 3 个安全问题：
+1. **缺少认证**：WebSocket 连接未验证 JWT token，任何人可连接
+2. **缺少 Rate Limiting**：无消息频率限制，可被 Flood 攻击
+3. **session_id 未校验**：未验证 session_id 格式（应为 UUID）且未检查用户是否有权访问该 session
+
+建议修复：
+- 在 accept() 前验证 token
+- 添加消息计数器 + 滑动窗口限流
+- 使用 Pydantic 校验 session_id 格式
+
+**人机迭代**：
+- 人类反馈：除了修复，还需要添加连接数上限（每个用户最多 5 个并发连接）
+- AI 补充：在连接管理器中添加 per-user 连接计数，超出时返回 429
+
+### 5.3 架构设计 Spec 协作 Prompt
+
+**场景**：人类提出需求，AI 输出架构 Spec，经过多轮迭代确定方案。
+
+**人类输入**：
+```
+设计一个可插拔的多 Agent 调度器，要求：
+1. 支持单 Agent 直接执行和多 Agent 并行执行
+2. Agent 之间可以有依赖关系（如 Agent B 需要 Agent A 的输出）
+3. 支持动态添加新的 Agent 类型（适配器模式）
+4. 执行过程需要实时推送到前端
+
+请先输出架构设计 Spec，我来审查。
+```
+
+**AI 输出 Spec 摘要**：
+```
+## Orchestrator 架构 Spec
+
+### 核心组件
+- AgentRegistry: 管理所有已注册的 Agent 适配器
+- ExecutionPlanner: LLM 驱动的任务规划器
+- DependencyGraph: DAG 依赖图 + 拓扑排序
+- TaskExecutor: 异步任务执行器（asyncio.gather 并行）
+
+### 数据流
+用户消息 → Orchestrator.analyze_intent()
+  → LLM 生成 JSON 执行计划
+  → 构建 DependencyGraph
+  → 拓扑排序得到执行层级
+  → 每层 Agent 并行执行
+  → 结果聚合 → 推送前端
+```
+
+**人机迭代**：
+- 第一轮：人类指出缺少错误恢复机制（某个 Agent 失败不应阻塞整个流程）
+- AI 更新：添加 fallback 策略 — 单个 Agent 超时/失败时跳过并记录，不阻塞后续步骤
+- 第二轮：人类要求支持 Agent 间消息传递（不只是依赖输出）
+- AI 更新：添加 AgentMessageBus，Agent 可以 publish/subscribe 消息通道
+
+### 5.4 UI 组件设计 Prompt
+
+**场景**：用 AI 生成符合苹果极简风格的 UI 组件。
+
+**人类输入**：
+```
+设计一个消息卡片组件 MessageCard，遵循以下 UI 规范：
+
+## 设计规范
+- 核心理念：少即是多，克制是最高级的美感
+- 禁止：霓虹渐变、发光效果、厚重阴影、大圆角
+- 色彩：背景纯白 #FFFFFF，主文本 #1D1D1F，辅助 #86868B
+- 强调色：仅 #0071E3，极度克制
+- 边框：极浅灰 #D2D2D7，仅 1px
+- 字体：-apple-system 栈，行高 1.5-1.6
+- 动效：transition-all duration-300 ease-in-out，仅允许淡入
+
+## 功能需求
+- 区分用户消息（右对齐，蓝色气泡）和 Agent 消息（左对齐，白色气泡）
+- 支持 Markdown 渲染
+- 支持代码块缩略展示
+- hover 时显示操作栏（复制、回复、引用、Pin）
+
+请输出 React + Tailwind 组件代码。
+```
+
+**AI 输出摘要**：
+```tsx
+// 核心结构
+<div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+  <div className="w-8 h-8 rounded-full bg-minimal-bg border border-minimal-border
+    flex items-center justify-center text-sm shrink-0">
+    {sender.avatar}
+  </div>
+  <div className={`max-w-[75%] ...`}>
+    <div className="px-3 py-2 rounded-lg text-sm
+      ${isUser ? 'bg-minimal-accent text-white'
+               : 'bg-white/80 backdrop-blur-sm border border-minimal-border ...'}">
+      <MarkdownRenderer content={textContent} />
+    </div>
+    {/* 操作栏 — hover 渐显 */}
+    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+      {/* 复制 · 回复 · 引用 · Pin */}
+    </div>
+  </div>
+</div>
+```
+
+**人机迭代**：
+- 人类反馈：操作栏的 translate-y 动画太明显，改为仅 opacity 变化
+- AI 调整：移除 translate-y class，仅保留 opacity-0 → opacity-100
+- 人类确认：符合克制风格，通过
+
+---
+
+## 六、纠错与迭代场景
+
+> 本节展示"AI 输出错误 → 人类纠正 → AI 修正"的真实对话模式，
+> 以及同一 Prompt 的版本演进过程。
+
+### 6.1 类型错误纠正
+
+**场景**：AI 生成的 WebSocket Schema 存在类型不匹配问题。
+
+**初始 Prompt**：
+```
+请为 WebSocket 消息定义 Pydantic Schema，支持以下消息类型：
+- ping/pong
+- sendMessage（用户发送消息）
+- agentStatus（Agent 状态推送）
+- messageChunk（消息流式片段）
+- messageComplete（消息完成）
+- error（错误）
+
+要求 camelCase 别名，使用 ConfigDict(alias_generator=...)。
+```
+
+**AI 输出（有问题）**：
+```python
+class SendMessagePayload(BaseModel):
+    session_id: UUID
+    content: str
+    reply_to_id: UUID | None = None
+
+class WSSendMessage(BaseModel):
+    type: str = "sendMessage"
+    timestamp: str
+    payload: SendMessagePayload
+```
+
+**人类纠正**：
+> `WSSendMessage` 的 `type` 字段应该是 Literal 类型而不是 str，否则无法做消息类型分发。
+> 另外 `SendMessagePayload` 缺少 `mentioned_agents` 字段，前端 @Agent 功能需要传递这个数据。
+
+**AI 修正**：
+```python
+class SendMessagePayload(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+    session_id: UUID
+    content: str = Field(min_length=1)
+    reply_to_id: UUID | None = None
+    mentioned_agents: list[UUID] | None = None
+
+class WSSendMessage(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+    type: Literal["sendMessage"] = "sendMessage"
+    timestamp: str
+    payload: SendMessagePayload
+```
+
+**修正要点**：
+- `type` 字段改为 `Literal` 类型，支持 Pydantic discriminated union
+- 新增 `mentioned_agents` 可选字段，支持 @Agent 路由
+- 确保所有模型都有 `model_config` 配置 camelCase 别名
+
+---
+
+### 6.2 UI 设计规范违反纠正
+
+**场景**：AI 生成的组件违反了苹果极简设计规范。
+
+**初始 Prompt**：
+```
+实现 Agent 状态指示器组件，显示 Agent 的在线/离线/忙碌状态。
+```
+
+**AI 输出（有问题）**：
+```tsx
+function StatusIndicator({ status }) {
+  const colors = {
+    online: 'bg-green-500 shadow-green-500/50',
+    offline: 'bg-gray-400',
+    busy: 'bg-yellow-500 shadow-yellow-500/50 animate-pulse',
+    error: 'bg-red-500 shadow-red-500/50',
+  };
+  return (
+    <div className={`w-3 h-3 rounded-full ${colors[status]}
+      shadow-lg transition-all duration-300`} />
+  );
+}
+```
+
+**人类纠正**：
+> 这个组件违反了多条设计规范：
+> 1. `shadow-lg` 是厚重阴影 — 规范要求"极其微妙"或不用阴影
+> 2. `animate-pulse` 是夸张动画 — 规范禁止弹跳、旋转、夸张缩放
+> 3. `shadow-green-500/50` 是霓虹发光效果 — 绝对禁止
+> 4. `w-3 h-3` 偏大，应使用 `w-2 h-2` 保持克制
+> 5. 颜色应使用项目的 semantic tokens（`bg-minimal-success`），不是 Tailwind 原色
+
+**AI 修正**：
+```tsx
+function StatusIndicator({ status }: { status?: 'online' | 'offline' | 'busy' | 'error' }) {
+  const colors: Record<string, string> = {
+    online: 'bg-minimal-success',
+    offline: 'bg-minimal-tertiary',
+    busy: 'bg-minimal-warning',
+    error: 'bg-minimal-error',
+  };
+  return (
+    <div className={`w-2 h-2 rounded-full ${colors[status ?? 'offline']} shrink-0`}
+      title={status ?? 'offline'} />
+  );
+}
+```
+
+**修正要点**：
+- 移除所有 `shadow-*` 和 `animate-*` 类
+- 使用项目的 semantic color tokens
+- 尺寸从 `w-3 h-3` 缩小到 `w-2 h-2`
+- 添加 `title` 属性作为无障碍访问的 tooltip
+
+---
+
+### 6.3 架构方案安全隐患纠正
+
+**场景**：AI 设计的 WebSocket 认证方案存在安全漏洞。
+
+**初始 Prompt**：
+```
+实现 WebSocket 连接的认证中间件，要求支持 JWT token 验证。
+```
+
+**AI 输出（有隐患）**：
+```python
+@router.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    await websocket.accept()
+    token = websocket.query_params.get("token")
+    if token:
+        try:
+            payload = decode_access_token(token)
+            # 继续处理...
+        except Exception:
+            await websocket.close(code=4003)
+    else:
+        # 允许匿名连接
+        pass
+```
+
+**人类纠正**：
+> 有三个安全问题：
+> 1. **匿名连接不应允许** — 无 token 时应该直接拒绝，不是 pass
+> 2. **token 验证应在 accept() 之前** — 先验证再接受连接，减少资源浪费
+> 3. **缺少 session 所有权校验** — 即使 token 有效，也要验证该用户是否有权访问这个 session
+
+**AI 修正**：
+```python
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, session_id: str, token: str | None = None):
+    # 认证在 accept 之前
+    if not token:
+        await websocket.close(code=4003, reason="Token required")
+        return
+
+    try:
+        payload = decode_access_token(token)
+    except Exception:
+        await websocket.close(code=4003, reason="Invalid or expired token")
+        return
+
+    user_id = payload.get("sub")
+
+    await websocket.accept()
+
+    async with async_session() as db:
+        session = await db.get(Session, uuid.UUID(session_id))
+        if not session:
+            await websocket.close(code=4003, reason="Session not found")
+            return
+
+        # 校验 session 所有权
+        if session.user_id != uuid.UUID(user_id):
+            await websocket.close(code=4003, reason="Session does not belong to this user")
+            return
+        # 继续处理...
+```
+
+**修正要点**：
+- 无 token 时直接关闭连接，不允许匿名
+- 认证逻辑在 `accept()` 之前执行
+- 增加 session 所有权校验，防止水平越权
+
+---
+
+### 6.4 Prompt 版本演进记录
+
+#### Prompt: "实现消息流式渲染"
+
+**V1 — 初始版本**（过于简单）：
+```
+实现 WebSocket 消息的流式渲染，消息分 chunk 到达。
+```
+
+问题：AI 不知道 chunk 的具体格式、如何处理 isFinal、以及如何合并为完整消息。
+
+**V2 — 补充协议细节**：
+```
+实现 WebSocket 消息的流式渲染。
+
+协议格式：
+- 每个 chunk 包含: { messageId, sessionId, agentId, chunkType, deltaContent, chunkIndex, isFinal }
+- chunkType 可以是: text, code_diff, web_preview, deploy_status, tool_status
+- isFinal=true 时表示消息结束
+
+要求：
+1. 按 messageId 聚合 chunks
+2. 实时追加 deltaContent 到消息体
+3. isFinal 时标记消息完成
+```
+
+改进：AI 理解了协议，但忽略了错误处理和并发场景。
+
+**V3 — 最终版本**（补充边界情况）：
+```
+实现 WebSocket 消息的流式渲染。
+
+协议格式：
+- chunk: { messageId, sessionId, agentId, chunkType, deltaContent, chunkIndex, isFinal }
+- error: { sessionId, errorCode, errorMessage, recoverable }
+- agentStatus: { sessionId, agentId, status, displayText }
+
+要求：
+1. 按 messageId 聚合 chunks，支持同一 sessionId 内多个并发消息流
+2. deltaContent 实时追加，注意处理空字符串的 isFinal（仅表示结束，无新内容）
+3. error 消息需要显示错误状态，但不覆盖正在流式输出的内容
+4. agentStatus 需要映射到 processingStatus 状态机：idle → sending → processing → streaming → idle
+5. 使用 useCallback 避免闭包陷阱，确保最新的 callback 引用
+```
+
+**演进总结**：
+
+| 版本 | 关注点 | 遗漏 |
+|------|--------|------|
+| V1 | 基本功能 | 协议格式、边界情况 |
+| V2 | 协议格式、聚合逻辑 | 错误处理、并发、状态机 |
+| V3 | 完整覆盖 | — |
+
+经验：每次迭代补充一类边界情况，直到覆盖所有真实场景。不要试图一步到位写出完美 Prompt。

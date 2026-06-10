@@ -135,6 +135,11 @@ dump.rdb
 site/
 /_site/
 
+# Test results & output
+test-results/
+frontend/test-results/
+scripts/e2e_output.txt
+
 # Misc
 *.tgz
 coverage/

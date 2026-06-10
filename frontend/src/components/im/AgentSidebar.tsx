@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { AgentProfile } from '@agenthub/shared/types/entities';
+import { OrchestratorVisualizer } from './OrchestratorVisualizer';
 
 interface AgentSidebarProps {
   agents: AgentProfile[];
@@ -9,11 +11,12 @@ interface AgentSidebarProps {
   width: number;
   onResizeStart: (e: React.MouseEvent) => void;
   children?: ReactNode;
+  agentStatuses?: Record<string, string>;
 }
 
 function RoleBadge({ role }: { role: 'orchestrator' | 'expert' }) {
   return (
-    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${role === 'orchestrator' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
+    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${role === 'orchestrator' ? 'bg-minimal-accent/10 text-minimal-accent' : 'bg-minimal-success/10 text-minimal-success'}`}>
       {role === 'orchestrator' ? 'Orchestrator' : 'Expert'}
     </span>
   );
@@ -21,10 +24,10 @@ function RoleBadge({ role }: { role: 'orchestrator' | 'expert' }) {
 
 function StatusIndicator({ status }: { status?: 'online' | 'offline' | 'busy' | 'error' }) {
   const colors: Record<string, string> = {
-    online: 'bg-green-500',
-    offline: 'bg-zinc-500',
-    busy: 'bg-amber-500',
-    error: 'bg-red-500',
+    online: 'bg-minimal-success',
+    offline: 'bg-minimal-tertiary',
+    busy: 'bg-minimal-warning',
+    error: 'bg-minimal-error',
   };
   return (
     <div className={`w-2 h-2 rounded-full ${colors[status ?? 'offline']} shrink-0`} title={status ?? 'offline'} />
@@ -32,23 +35,23 @@ function StatusIndicator({ status }: { status?: 'online' | 'offline' | 'busy' | 
 }
 
 const CAPABILITY_TAGS: Record<string, { icon: string; label: string; color: string }> = {
-  code_gen: { icon: '💻', label: '代码生成', color: 'bg-indigo-500/20 text-indigo-400' },
-  web_search: { icon: '🌐', label: '联网搜索', color: 'bg-blue-500/20 text-blue-400' },
-  fs_io: { icon: '📁', label: '文件读写', color: 'bg-amber-500/20 text-amber-400' },
-  terminal: { icon: '🐚', label: '终端执行', color: 'bg-green-500/20 text-green-400' },
-  deploy: { icon: '🚀', label: '一键部署', color: 'bg-purple-500/20 text-purple-400' },
+  code_gen: { icon: '💻', label: '代码生成', color: 'bg-minimal-accent/10 text-minimal-accent' },
+  web_search: { icon: '🌐', label: '联网搜索', color: 'bg-minimal-accent/10 text-minimal-accent' },
+  fs_io: { icon: '📁', label: '文件读写', color: 'bg-minimal-warning/10 text-minimal-warning' },
+  terminal: { icon: '🐚', label: '终端执行', color: 'bg-minimal-success/10 text-minimal-success' },
+  deploy: { icon: '🚀', label: '一键部署', color: 'bg-minimal-success/10 text-minimal-success' },
 };
 
 function AgentCard({ agent }: { agent: AgentProfile }) {
   const capabilities = (agent as AgentProfile & { capabilities?: string[] }).capabilities ?? [];
 
   return (
-    <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors duration-150">
+    <div className="p-3 bg-white dark:bg-minimal-dark-surface rounded-minimal border border-minimal-border dark:border-minimal-dark-border hover:border-minimal-accent/30 transition-colors duration-300">
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-sm">{agent.avatar}</div>
+        <div className="w-8 h-8 rounded-full bg-minimal-bg dark:bg-minimal-dark-bg flex items-center justify-center text-sm">{agent.avatar}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-zinc-200 truncate">{agent.name}</span>
+            <span className="text-sm font-medium text-minimal-text dark:text-minimal-dark-text truncate">{agent.name}</span>
             <StatusIndicator status={agent.status} />
           </div>
           <div className="flex items-center gap-1.5 mt-1">
@@ -56,7 +59,7 @@ function AgentCard({ agent }: { agent: AgentProfile }) {
           </div>
         </div>
       </div>
-      <p className="text-xs text-zinc-500 line-clamp-2 mb-2">{agent.description}</p>
+      <p className="text-xs text-minimal-secondary dark:text-minimal-dark-secondary line-clamp-2 mb-2">{agent.description}</p>
       {capabilities.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {capabilities.map((cap) => {
@@ -74,35 +77,61 @@ function AgentCard({ agent }: { agent: AgentProfile }) {
   );
 }
 
-export function AgentSidebar({ agents, isOpen, width, onResizeStart, children }: AgentSidebarProps) {
+export function AgentSidebar({ agents, isOpen, width, onResizeStart, children, agentStatuses = {} }: AgentSidebarProps) {
+  const [showTopology, setShowTopology] = useState(false);
+
+  const topologyData = useMemo(() => {
+    return agents.map((a) => ({
+      id: a.id,
+      name: a.name,
+      status: (agentStatuses[a.id] as 'idle' | 'working' | 'done' | 'error') ?? 'idle',
+    }));
+  }, [agents, agentStatuses]);
+
   if (!isOpen) return null;
 
   return (
-    <aside className="relative bg-zinc-950 dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 flex flex-col shrink-0" style={{ width }}>
+    <aside className="relative bg-minimal-glass/60 dark:bg-minimal-dark-glass/60 backdrop-blur-xl border-l border-minimal-glass-border dark:border-minimal-dark-glass-border flex flex-col shrink-0" style={{ width }}>
       <div
         onMouseDown={onResizeStart}
-        className="absolute left-0 top-0 w-1 h-full cursor-col-resize hover:bg-indigo-500/50 transition-colors z-10"
+        className="absolute left-0 top-0 w-1 h-full cursor-col-resize hover:bg-minimal-accent/30 transition-colors duration-300 z-10"
       />
       {children ? (
         <div className="flex-1 overflow-hidden flex flex-col">{children}</div>
       ) : (
         <>
-          <div className="p-4 border-b border-zinc-800">
-            <h3 className="text-sm font-semibold text-zinc-200">智能体面板</h3>
+          <div className="p-4 border-b border-minimal-border dark:border-minimal-dark-border">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-minimal-text dark:text-minimal-dark-text">智能体面板</h3>
+              {agents.length > 1 && (
+                <button
+                  onClick={() => setShowTopology((p) => !p)}
+                  className={`px-2 py-0.5 text-[10px] rounded transition-colors duration-200 ${showTopology ? 'bg-minimal-accent/10 text-minimal-accent' : 'bg-minimal-bg dark:bg-minimal-dark-bg text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text'}`}
+                >
+                  {showTopology ? '列表' : '拓扑'}
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-2 mt-1">
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                <span className="text-[11px] text-zinc-500">{agents.filter((a) => a.status === 'online').length} 在线</span>
+                <div className="w-2 h-2 bg-minimal-success rounded-full" />
+                <span className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary">{agents.filter((a) => a.status === 'online').length} 在线</span>
               </div>
-              <span className="text-zinc-700">·</span>
-              <span className="text-[11px] text-zinc-500">{agents.length} 个专家就绪</span>
+              <span className="text-minimal-border dark:text-minimal-dark-border">·</span>
+              <span className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary">{agents.length} 个专家就绪</span>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-            {agents.map((agent) => (
-              <AgentCard key={agent.id} agent={agent} />
-            ))}
-          </div>
+          {showTopology ? (
+            <div className="flex-1 overflow-hidden">
+              <OrchestratorVisualizer agents={topologyData} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600">
+              {agents.map((agent) => (
+                <AgentCard key={agent.id} agent={agent} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </aside>

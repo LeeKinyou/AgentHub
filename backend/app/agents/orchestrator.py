@@ -18,7 +18,7 @@ OrchestratorEvent = Union[MessageChunk, AgentStatusEvent]
 # Planning prompt — produces a structured execution plan from user intent
 # ---------------------------------------------------------------------------
 
-PLANNING_SYSTEM_PROMPT = """\
+PLANNING_SYSTEM_PROMPT_SINGLE = """\
 You are the orchestration brain of a multi-agent coding platform.
 
 Given a user request and a roster of expert agents, analyse the intent and
@@ -35,6 +35,30 @@ Rules:
 - Steps execute sequentially; later steps may use earlier outputs as context.
 - Prefer the MINIMUM number of steps — do not split tasks unnecessarily.
 - If the request is simple enough for a single agent, emit a single-step plan.
+- Reference agents by their exact `id` value from the roster."""
+
+PLANNING_SYSTEM_PROMPT_GROUP = """\
+You are the orchestration brain of a multi-agent coding platform.
+
+Given a user request and a roster of expert agents, analyse the intent and
+produce an execution plan as a JSON array. This is a GROUP session with
+multiple agents available — you SHOULD distribute work across agents to
+leverage their different expertise.
+
+Respond with ONLY a valid JSON array (no markdown fences, no explanation):
+[
+  {"agent_id": "<id>", "task": "<concise sub-task description>"},
+  ...
+]
+
+Rules:
+- Each step targets exactly one agent whose expertise best matches the sub-task.
+- Steps execute sequentially; later steps may use earlier outputs as context.
+- DIFFERENT agents should handle DIFFERENT aspects of the task based on their skills.
+- Do NOT assign everything to a single agent unless the task is truly trivial.
+- Use `depends_on` to specify step dependencies for parallel execution:
+  {"agent_id": "<id>", "task": "...", "depends_on": [0, 1]}
+  Steps without dependencies on each other will run in parallel.
 - Reference agents by their exact `id` value from the roster."""
 
 
@@ -169,7 +193,7 @@ class Orchestrator:
             display_text="Analysing intent and planning execution…",
         )
 
-        steps = await self._plan_execution(user_content, agent_roster)
+        steps = await self._plan_execution(user_content, agent_roster, is_group=len(agent_roster) > 1)
 
         if steps is None:
             # Planning failed — degrade to single-agent (first expert)
@@ -318,14 +342,21 @@ class Orchestrator:
         self,
         user_content: str,
         agent_roster: list[AgentDescriptor],
+        *,
+        is_group: bool = False,
     ) -> list[PlanStep] | None:
         """Call an LLM to decompose the user request into sub-tasks.
 
         Uses the first agent whose role is 'orchestrator' (if any), otherwise
         falls back to the default Anthropic model from settings.
 
+        Args:
+            is_group: If True, use group planning prompt that encourages
+                      distributing work across multiple agents.
+
         Returns a list of PlanStep on success, None on failure.
         """
+        system_prompt = PLANNING_SYSTEM_PROMPT_GROUP if is_group else PLANNING_SYSTEM_PROMPT_SINGLE
         roster_text = _build_roster_prompt(agent_roster)
         prompt = (
             f"Available agents:\n{roster_text}\n\n"
@@ -337,16 +368,16 @@ class Orchestrator:
 
         try:
             if api_provider == "openai":
-                raw = await self._plan_with_openai(plan_model, plan_api_key, base_url, prompt)
+                raw = await self._plan_with_openai(plan_model, plan_api_key, base_url, prompt, system_prompt)
             else:
-                raw = await self._plan_with_anthropic(plan_model, plan_api_key, prompt)
+                raw = await self._plan_with_anthropic(plan_model, plan_api_key, prompt, system_prompt)
             return self._parse_plan(raw, agent_roster)
 
         except Exception as exc:
             logger.exception("Planning LLM call failed: %s", exc)
             return None
 
-    async def _plan_with_anthropic(self, model: str, api_key: str, prompt: str) -> str:
+    async def _plan_with_anthropic(self, model: str, api_key: str, prompt: str, system_prompt: str) -> str:
         """Plan using Anthropic Claude API."""
         if self._planner_client is None or self._planner_api_key != api_key:
             self._planner_client = anthropic.AsyncAnthropic(api_key=api_key, timeout=120.0)
@@ -355,12 +386,12 @@ class Orchestrator:
         response = await self._planner_client.messages.create(
             model=model,
             max_tokens=1024,
-            system=PLANNING_SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[{"role": "user", "content": prompt}],
         )
         return response.content[0].text.strip()
 
-    async def _plan_with_openai(self, model: str, api_key: str, base_url: str, prompt: str) -> str:
+    async def _plan_with_openai(self, model: str, api_key: str, base_url: str, prompt: str, system_prompt: str) -> str:
         """Plan using OpenAI-compatible API (e.g. MiMo)."""
         from ..core.config import get_settings
         settings = get_settings()
@@ -377,7 +408,7 @@ class Orchestrator:
             model=model,
             max_tokens=1024,
             messages=[
-                {"role": "system", "content": PLANNING_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -437,13 +468,16 @@ class Orchestrator:
                 continue
             agent_id = item.get("agent_id", "")
             task = item.get("task", "")
+            depends_on = item.get("depends_on", [])
             if agent_id not in valid_ids:
                 logger.warning("Plan step %d references unknown agent %r, skipping", i, agent_id)
                 continue
             if not task:
                 logger.warning("Plan step %d has empty task, skipping", i)
                 continue
-            steps.append(PlanStep(agent_id=agent_id, task=task))
+            # Validate depends_on references
+            valid_depends = [d for d in depends_on if isinstance(d, int) and 0 <= d < i]
+            steps.append(PlanStep(agent_id=agent_id, task=task, depends_on=valid_depends))
 
         return steps
 

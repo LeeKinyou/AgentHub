@@ -49,7 +49,6 @@ function formatCost(n: number): string {
   return `$${n.toFixed(4)}`;
 }
 
-// 从本地消息记录中提取使用统计（模拟数据源）
 function getRecentDates(days: number): string[] {
   const dates: string[] = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -63,6 +62,7 @@ function getRecentDates(days: number): string[] {
 export function UsageStatsPanel() {
   const [stats, setStats] = useState<UsageStats>(loadStats());
   const [period, setPeriod] = useState<7 | 14 | 30>(7);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     setStats(loadStats());
@@ -71,7 +71,6 @@ export function UsageStatsPanel() {
   const dates = getRecentDates(period);
   const periodRecords = stats.records.filter((r) => dates.includes(r.date));
 
-  // 按日期聚合
   const dailyStats = dates.map((date) => {
     const dayRecords = periodRecords.filter((r) => r.date === date);
     return {
@@ -82,7 +81,6 @@ export function UsageStatsPanel() {
     };
   });
 
-  // 按模型聚合
   const modelStats = new Map<string, { inputTokens: number; outputTokens: number; cost: number; count: number }>();
   periodRecords.forEach((r) => {
     const existing = modelStats.get(r.model) ?? { inputTokens: 0, outputTokens: 0, cost: 0, count: 0 };
@@ -100,91 +98,75 @@ export function UsageStatsPanel() {
   const periodCost = periodRecords.reduce((s, r) => s + r.cost, 0);
 
   return (
-    <div className="flex flex-col gap-5 p-4">
-      {/* 概览卡片 */}
+    <div className="space-y-6">
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-            <span>📊</span> 使用概览
-          </h3>
+          <h3 className="text-sm font-medium text-minimal-text dark:text-minimal-dark-text">使用概览</h3>
           <div className="flex gap-1">
             {([7, 14, 30] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-2 py-0.5 text-[11px] rounded transition-colors ${period === p ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'}`}
-              >
-                {p}天
-              </button>
+              <button key={p} onClick={() => setPeriod(p)} className={`px-2 py-0.5 text-[11px] rounded transition-colors duration-300 ${period === p ? 'bg-minimal-accent text-white' : 'bg-minimal-bg dark:bg-minimal-dark-bg text-minimal-secondary hover:text-minimal-text'}`}>{p}天</button>
             ))}
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-800">
-            <p className="text-[11px] text-zinc-500 mb-1">输入 Tokens</p>
-            <p className="text-lg font-semibold text-blue-400 font-mono">{formatTokens(periodInput)}</p>
+          <div className="p-3 rounded-xl bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border">
+            <p className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1">输入 Tokens</p>
+            <p className="text-lg font-medium text-minimal-accent font-mono">{formatTokens(periodInput)}</p>
           </div>
-          <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-800">
-            <p className="text-[11px] text-zinc-500 mb-1">输出 Tokens</p>
-            <p className="text-lg font-semibold text-emerald-400 font-mono">{formatTokens(periodOutput)}</p>
+          <div className="p-3 rounded-xl bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border">
+            <p className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1">输出 Tokens</p>
+            <p className="text-lg font-medium text-minimal-success font-mono">{formatTokens(periodOutput)}</p>
           </div>
-          <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-800">
-            <p className="text-[11px] text-zinc-500 mb-1">预估费用</p>
-            <p className="text-lg font-semibold text-amber-400 font-mono">{formatCost(periodCost)}</p>
+          <div className="p-3 rounded-xl bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border">
+            <p className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1">预估费用</p>
+            <p className="text-lg font-medium text-minimal-warning font-mono">{formatCost(periodCost)}</p>
           </div>
         </div>
       </section>
 
-      {/* 每日用量柱状图 */}
       <section>
-        <h3 className="text-sm font-semibold text-zinc-200 mb-3">每日用量</h3>
+        <h3 className="text-sm font-medium text-minimal-text dark:text-minimal-dark-text mb-3">每日用量</h3>
         <div className="flex items-end gap-1 h-24">
           {dailyStats.map((d) => {
             const total = d.inputTokens + d.outputTokens;
-            const height = total > 0 ? Math.max(4, (total / maxTokens) * 100) : 0;
             return (
               <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${d.date}: ${formatTokens(total)} tokens`}>
                 <div className="w-full flex flex-col items-center justify-end" style={{ height: '80px' }}>
                   {total > 0 ? (
                     <>
-                      <div className="w-full rounded-t" style={{ height: `${(d.outputTokens / maxTokens) * 80}px`, backgroundColor: 'rgb(52 211 153 / 0.6)' }} />
-                      <div className="w-full rounded-b" style={{ height: `${(d.inputTokens / maxTokens) * 80}px`, backgroundColor: 'rgb(96 165 250 / 0.6)' }} />
+                      <div className="w-full rounded-t" style={{ height: `${(d.outputTokens / maxTokens) * 80}px`, backgroundColor: 'rgb(52 199 89 / 0.4)' }} />
+                      <div className="w-full rounded-b" style={{ height: `${(d.inputTokens / maxTokens) * 80}px`, backgroundColor: 'rgb(0 113 227 / 0.4)' }} />
                     </>
                   ) : (
-                    <div className="w-full h-1 rounded bg-zinc-800" />
+                    <div className="w-full h-1 rounded bg-minimal-border dark:bg-minimal-dark-border" />
                   )}
                 </div>
-                <span className="text-[9px] text-zinc-600">{d.date.slice(5)}</span>
+                <span className="text-[9px] text-minimal-tertiary">{d.date.slice(5)}</span>
               </div>
             );
           })}
         </div>
         <div className="flex gap-3 mt-2 justify-center">
-          <span className="flex items-center gap-1 text-[10px] text-zinc-500">
-            <span className="w-2 h-2 rounded-sm bg-blue-400/60" /> 输入
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-zinc-500">
-            <span className="w-2 h-2 rounded-sm bg-emerald-400/60" /> 输出
-          </span>
+          <span className="flex items-center gap-1 text-[10px] text-minimal-secondary"><span className="w-2 h-2 rounded-sm bg-minimal-accent/40" /> 输入</span>
+          <span className="flex items-center gap-1 text-[10px] text-minimal-secondary"><span className="w-2 h-2 rounded-sm bg-minimal-success/40" /> 输出</span>
         </div>
       </section>
 
-      {/* 模型用量明细 */}
       <section>
-        <h3 className="text-sm font-semibold text-zinc-200 mb-3">模型用量明细</h3>
+        <h3 className="text-sm font-medium text-minimal-text dark:text-minimal-dark-text mb-3">模型用量明细</h3>
         {modelStats.size === 0 ? (
-          <div className="text-center py-6 text-zinc-600 text-xs">暂无用量数据，开始对话后将自动记录</div>
+          <div className="text-center py-6 text-minimal-tertiary text-xs">暂无用量数据，开始对话后将自动记录</div>
         ) : (
           <div className="space-y-2">
             {[...modelStats.entries()].sort((a, b) => b[1].cost - a[1].cost).map(([model, data]) => (
-              <div key={model} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-800/50 border border-zinc-800">
+              <div key={model} className="flex items-center gap-3 p-3 rounded-xl bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border">
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm text-zinc-200 font-mono">{model}</span>
-                  <p className="text-[11px] text-zinc-500">{data.count} 次调用</p>
+                  <span className="text-sm text-minimal-text dark:text-minimal-dark-text font-mono">{model}</span>
+                  <p className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary">{data.count} 次调用</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-xs text-zinc-300 font-mono">{formatTokens(data.inputTokens + data.outputTokens)} tokens</p>
-                  <p className="text-[11px] text-amber-400 font-mono">{formatCost(data.cost)}</p>
+                  <p className="text-xs text-minimal-text dark:text-minimal-dark-text font-mono">{formatTokens(data.inputTokens + data.outputTokens)} tokens</p>
+                  <p className="text-[11px] text-minimal-warning font-mono">{formatCost(data.cost)}</p>
                 </div>
               </div>
             ))}
@@ -192,36 +174,38 @@ export function UsageStatsPanel() {
         )}
       </section>
 
-      {/* 参考价格 */}
       <section>
-        <h3 className="text-sm font-semibold text-zinc-200 mb-3">参考价格 (每 1K tokens)</h3>
+        <h3 className="text-sm font-medium text-minimal-text dark:text-minimal-dark-text mb-3">参考价格 (每 1K tokens)</h3>
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(MODEL_COSTS).map(([model, cost]) => (
-            <div key={model} className="p-2 rounded-lg bg-zinc-800/30 border border-zinc-800">
-              <span className="text-[11px] text-zinc-400 font-mono">{model}</span>
+            <div key={model} className="p-2.5 rounded-xl bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border">
+              <span className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary font-mono">{model}</span>
               <div className="flex gap-2 mt-1">
-                <span className="text-[10px] text-blue-400">入 ${cost.input}</span>
-                <span className="text-[10px] text-emerald-400">出 ${cost.output}</span>
+                <span className="text-[10px] text-minimal-accent">入 ${cost.input}</span>
+                <span className="text-[10px] text-minimal-success">出 ${cost.output}</span>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 清除数据 */}
       <div className="flex justify-end">
-        <button
-          onClick={() => {
-            if (confirm('确认清除所有用量统计数据？')) {
-              localStorage.removeItem(USAGE_KEY);
-              setStats({ records: [], totalInputTokens: 0, totalOutputTokens: 0, totalCost: 0 });
-            }
-          }}
-          className="px-3 py-1.5 text-xs text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors"
-        >
+        <button onClick={() => setShowClearConfirm(true)} className="px-3 py-1.5 text-xs text-minimal-error border border-minimal-error/30 rounded-lg hover:bg-minimal-error/5 transition-colors duration-300">
           清除用量数据
         </button>
       </div>
+
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={() => setShowClearConfirm(false)}>
+          <div className="bg-white dark:bg-minimal-dark-surface border border-minimal-border dark:border-minimal-dark-border rounded-xl p-5 w-80 shadow-minimal-md" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm text-minimal-text dark:text-minimal-dark-text mb-5">确认清除所有用量统计数据？</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowClearConfirm(false)} className="px-3 py-1.5 text-sm text-minimal-secondary hover:text-minimal-text transition-colors duration-300">取消</button>
+              <button onClick={() => { localStorage.removeItem(USAGE_KEY); setStats({ records: [], totalInputTokens: 0, totalOutputTokens: 0, totalCost: 0 }); setShowClearConfirm(false); }} className="px-3 py-1.5 text-sm bg-minimal-error text-white rounded-lg hover:opacity-90 transition-opacity duration-300">确认清除</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

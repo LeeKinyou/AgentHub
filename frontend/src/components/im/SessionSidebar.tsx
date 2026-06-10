@@ -19,35 +19,36 @@ function SessionItem({ session, activeId, onSelect, onDelete, onPin, onArchive }
   return (
     <div className="group relative">
       <button onClick={() => onSelect(session.id)}
-        className={`w-full text-left px-3 py-2 rounded-md transition-colors duration-150 border-l-2 ${session.id === activeId ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-indigo-500' : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-700 dark:hover:text-zinc-300 border-transparent'}`}>
+        data-testid={`session-item-${session.id}`}
+        className={`w-full text-left px-3 py-2 rounded-minimal transition-colors duration-300 border-l-2 ${session.id === activeId ? 'bg-minimal-accent/5 text-minimal-text border-minimal-accent' : 'text-minimal-secondary hover:bg-minimal-bg hover:text-minimal-text border-transparent'}`}>
         <div className="flex items-center gap-2">
           {session.type === 'group' && session.agentIds.length > 0 && <AvatarStack agentIds={session.agentIds} />}
           <span className="truncate text-sm">{session.title}</span>
         </div>
         {session.lastMessagePreview && (
-          <p className="text-[11px] text-zinc-400 dark:text-zinc-600 truncate mt-0.5">{session.lastMessagePreview}</p>
+          <p className="text-[11px] text-minimal-tertiary truncate mt-0.5">{session.lastMessagePreview}</p>
         )}
       </button>
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150">
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300">
         {session.isPinned && (
-          <span className="text-[10px] text-amber-500" title="已置顶">📌</span>
+          <span className="text-[10px] text-minimal-warning" title="已置顶">📌</span>
         )}
         {onPin && (
           <button onClick={(e) => { e.stopPropagation(); onPin(session.id); }}
-            className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-amber-500 transition-colors"
+            className="p-1 rounded hover:bg-minimal-bg text-minimal-tertiary hover:text-minimal-warning transition-colors duration-300"
             title={session.isPinned ? "取消置顶" : "置顶"}>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
           </button>
         )}
         {onArchive && (
           <button onClick={(e) => { e.stopPropagation(); onArchive(session.id); }}
-            className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-blue-500 transition-colors"
+            className="p-1 rounded hover:bg-minimal-bg text-minimal-tertiary hover:text-minimal-accent transition-colors duration-300"
             title={session.isArchived ? "取消归档" : "归档"}>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
           </button>
         )}
         <button onClick={(e) => { e.stopPropagation(); onDelete(session.id); }}
-          className="p-1 rounded hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors" title="删除会话">
+          className="p-1 rounded hover:bg-minimal-error/10 text-minimal-tertiary hover:text-minimal-error transition-colors duration-300" title="删除会话">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
         </button>
       </div>
@@ -55,15 +56,15 @@ function SessionItem({ session, activeId, onSelect, onDelete, onPin, onArchive }
   );
 }
 
-function SectionHeader({ label, expanded, onToggle, onAdd, addTitle }: { label: string; expanded: boolean; onToggle: () => void; onAdd?: () => void; addTitle?: string }) {
+function SectionHeader({ label, expanded, onToggle, onAdd, addTitle, testId }: { label: string; expanded: boolean; onToggle: () => void; onAdd?: () => void; addTitle?: string; testId?: string }) {
   return (
     <div className="px-3 py-1.5 flex items-center justify-between">
       <button onClick={onToggle} className="flex items-center gap-1 min-w-0">
-        <svg className={`w-3 h-3 text-zinc-400 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
-        <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-600 uppercase tracking-wider truncate">{label}</span>
+        <svg className={`w-3 h-3 text-minimal-tertiary shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+        <span className="text-[10px] font-medium text-minimal-secondary uppercase tracking-wider truncate">{label}</span>
       </button>
       {onAdd && (
-        <button onClick={onAdd} className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors shrink-0" title={addTitle}>
+        <button onClick={onAdd} data-testid={testId} className="w-5 h-5 flex items-center justify-center rounded hover:bg-minimal-bg text-minimal-tertiary hover:text-minimal-text transition-colors duration-300 shrink-0" title={addTitle}>
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
         </button>
       )}
@@ -79,11 +80,11 @@ export function SessionSidebar({ sessions, activeId, onSelect, onPlusClick, onOp
 
   const filteredSessions = useMemo(() => {
     let filtered = sessions.filter((s) => showArchived ? s.isArchived : !s.isArchived);
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((s) => 
-        s.title.toLowerCase().includes(query) || 
+      filtered = filtered.filter((s) =>
+        s.title.toLowerCase().includes(query) ||
         s.lastMessagePreview?.toLowerCase().includes(query)
       );
     }
@@ -91,7 +92,7 @@ export function SessionSidebar({ sessions, activeId, onSelect, onPlusClick, onOp
     return filtered.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
-      
+
       const aTime = a.lastActiveAt || a.createdAt;
       const bTime = b.lastActiveAt || b.createdAt;
       return new Date(bTime).getTime() - new Date(aTime).getTime();
@@ -105,10 +106,10 @@ export function SessionSidebar({ sessions, activeId, onSelect, onPlusClick, onOp
     <div className="flex flex-col">
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-zinc-500">我的会话</span>
-          <button 
+          <span className="text-xs font-medium text-minimal-secondary">我的会话</span>
+          <button
             onClick={() => setShowArchived((p) => !p)}
-            className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+            className="text-[10px] text-minimal-tertiary hover:text-minimal-text transition-colors duration-300"
           >
             {showArchived ? '显示活跃' : '显示归档'}
           </button>
@@ -119,28 +120,28 @@ export function SessionSidebar({ sessions, activeId, onSelect, onPlusClick, onOp
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="搜索会话..."
-            className="w-full px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors"
+            className="w-full px-3 py-1.5 bg-minimal-bg border border-minimal-border rounded-minimal text-xs text-minimal-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300"
           />
-          <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-minimal-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 pb-2 space-y-3 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-800">
+      <nav className="flex-1 overflow-y-auto px-2 pb-2 space-y-3 scrollbar-thin scrollbar-thumb-zinc-300">
         <div>
-          <SectionHeader label="💬 单聊模式 (Direct)" expanded={isDirectExpanded} onToggle={() => setIsDirectExpanded((p) => !p)} onAdd={onPlusClick} addTitle="新建单聊" />
+          <SectionHeader label="💬 单聊模式 (Direct)" expanded={isDirectExpanded} onToggle={() => setIsDirectExpanded((p) => !p)} onAdd={onPlusClick} addTitle="新建单聊" testId="add-single-chat" />
           {isDirectExpanded && (
             <div className="space-y-0.5">
-              {directSessions.length === 0 && <p className="px-3 py-2 text-[11px] text-zinc-400 italic">{searchQuery ? '无匹配结果' : '暂无单聊会话'}</p>}
+              {directSessions.length === 0 && <p className="px-3 py-2 text-[11px] text-minimal-tertiary italic">{searchQuery ? '无匹配结果' : '暂无单聊会话'}</p>}
               {directSessions.map((s) => <SessionItem key={s.id} session={s} activeId={activeId} onSelect={onSelect} onDelete={onDelete} onPin={onPin} onArchive={onArchive} />)}
             </div>
           )}
         </div>
         <div>
-          <SectionHeader label="🤖 群聊协作 (Groups)" expanded={isGroupsExpanded} onToggle={() => setIsGroupsExpanded((p) => !p)} onAdd={onOpenGroupModal} addTitle="创建群组" />
+          <SectionHeader label="🤖 群聊协作 (Groups)" expanded={isGroupsExpanded} onToggle={() => setIsGroupsExpanded((p) => !p)} onAdd={onOpenGroupModal} addTitle="创建群组" testId="add-group-chat" />
           {isGroupsExpanded && (
             <div className="space-y-0.5">
-              {groupSessions.length === 0 && <p className="px-3 py-2 text-[11px] text-zinc-400 italic">{searchQuery ? '无匹配结果' : '暂无群聊会话'}</p>}
+              {groupSessions.length === 0 && <p className="px-3 py-2 text-[11px] text-minimal-tertiary italic">{searchQuery ? '无匹配结果' : '暂无群聊会话'}</p>}
               {groupSessions.map((s) => <SessionItem key={s.id} session={s} activeId={activeId} onSelect={onSelect} onDelete={onDelete} onPin={onPin} onArchive={onArchive} />)}
             </div>
           )}

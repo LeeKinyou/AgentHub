@@ -14,7 +14,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         self.client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
         self.model = settings.ANTHROPIC_MODEL
 
-    async def send_message(
+    async def stream_chat(
         self,
         messages: list[Message],
         **kwargs,

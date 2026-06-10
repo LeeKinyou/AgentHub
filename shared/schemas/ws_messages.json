@@ -53,6 +53,14 @@
               "type": "string",
               "format": "uuid",
               "description": "Optional ID of the message being replied to"
+            },
+            "mentionedAgents": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "description": "Optional list of agent IDs explicitly mentioned via @AgentName"
             }
           },
           "additionalProperties": false
