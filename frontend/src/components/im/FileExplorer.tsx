@@ -11,6 +11,7 @@ interface FileExplorerProps {
   onOpenFileTransient: (name: string, handle: FileSystemFileHandle) => void;
   onFileAction: (action: 'create' | 'delete' | 'copy', node: FileNode, fileName?: string) => void;
   onReauthorize?: () => void;
+  needsReauth?: boolean;
 }
 
 function getFileIcon(name: string): string {
@@ -70,7 +71,7 @@ function FileTreeItem({ node, depth, activeFileName, onOpenFile, onOpenFileTrans
   );
 }
 
-export function FileExplorer({ root, activeFileName, onOpenFile, onOpenFileTransient, onFileAction, onReauthorize }: FileExplorerProps) {
+export function FileExplorer({ root, activeFileName, onOpenFile, onOpenFileTransient, onFileAction, onReauthorize, needsReauth }: FileExplorerProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [createTarget, setCreateTarget] = useState<FileNode | null>(null);
   const [newFileName, setNewFileName] = useState('untitled.txt');
@@ -89,11 +90,21 @@ export function FileExplorer({ root, activeFileName, onOpenFile, onOpenFileTrans
     if (createTarget && newFileName.trim()) { onFileAction('create', createTarget, newFileName.trim()); setCreateTarget(null); }
   };
 
+  const isEmpty = !root.children || root.children.length === 0;
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600">
-        <FileTreeItem node={root} depth={0} activeFileName={activeFileName} onOpenFile={onOpenFile} onOpenFileTransient={onOpenFileTransient} onContextMenu={handleContextMenu} />
-      </div>
+      {isEmpty ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 text-center">
+          <span className="text-2xl">{needsReauth ? '🔐' : '📂'}</span>
+          <p className="text-xs text-minimal-secondary dark:text-minimal-dark-secondary">{needsReauth ? '文件访问权限已过期' : '项目文件夹为空'}</p>
+          <button onClick={onReauthorize} className="px-3 py-1.5 rounded-minimal text-xs font-medium bg-minimal-accent hover:bg-minimal-accent-hover text-white transition-colors duration-300">{needsReauth ? '重新授权' : '打开文件夹'}</button>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600">
+          <FileTreeItem node={root} depth={0} activeFileName={activeFileName} onOpenFile={onOpenFile} onOpenFileTransient={onOpenFileTransient} onContextMenu={handleContextMenu} />
+        </div>
+      )}
       {contextMenu && <FileContextMenu x={contextMenu.x} y={contextMenu.y} targetNode={contextMenu.node} onClose={() => setContextMenu(null)} onAction={handleAction} />}
       {createTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setCreateTarget(null)}>

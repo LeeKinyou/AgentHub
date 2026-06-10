@@ -9,16 +9,17 @@ interface UIState {
   isSettingsOpen: boolean;
   isCreateProjectOpen: boolean;
   isOrchestratorOpen: boolean;
-  setRightPanelOpen: (v: boolean) => void;
+  setRightPanelOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleRightPanel: () => void;
-  setSessionModalOpen: (v: boolean) => void;
+  setSessionModalOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+  setConsoleOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleConsole: () => void;
-  setFilesExpanded: (v: boolean) => void;
+  setFilesExpanded: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleFilesExpanded: () => void;
-  setGroupModalOpen: (v: boolean) => void;
-  setSettingsOpen: (v: boolean) => void;
-  setCreateProjectOpen: (v: boolean) => void;
-  setOrchestratorOpen: (v: boolean) => void;
+  setGroupModalOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+  setSettingsOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+  setCreateProjectOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+  setOrchestratorOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -30,14 +31,15 @@ export const useUIStore = create<UIState>((set) => ({
   isSettingsOpen: false,
   isCreateProjectOpen: false,
   isOrchestratorOpen: false,
-  setRightPanelOpen: (v) => set({ isRightPanelOpen: v }),
+  setRightPanelOpen: (v) => set((s) => ({ isRightPanelOpen: typeof v === 'function' ? v(s.isRightPanelOpen) : v })),
   toggleRightPanel: () => set((s) => ({ isRightPanelOpen: !s.isRightPanelOpen })),
-  setSessionModalOpen: (v) => set({ isSessionModalOpen: v }),
+  setSessionModalOpen: (v) => set((s) => ({ isSessionModalOpen: typeof v === 'function' ? v(s.isSessionModalOpen) : v })),
+  setConsoleOpen: (v) => set((s) => ({ isConsoleOpen: typeof v === 'function' ? v(s.isConsoleOpen) : v })),
   toggleConsole: () => set((s) => ({ isConsoleOpen: !s.isConsoleOpen })),
-  setFilesExpanded: (v) => set({ isFilesExpanded: v }),
+  setFilesExpanded: (v) => set((s) => ({ isFilesExpanded: typeof v === 'function' ? v(s.isFilesExpanded) : v })),
   toggleFilesExpanded: () => set((s) => ({ isFilesExpanded: !s.isFilesExpanded })),
-  setGroupModalOpen: (v) => set({ isGroupModalOpen: v }),
-  setSettingsOpen: (v) => set({ isSettingsOpen: v }),
-  setCreateProjectOpen: (v) => set({ isCreateProjectOpen: v }),
-  setOrchestratorOpen: (v) => set({ isOrchestratorOpen: v }),
+  setGroupModalOpen: (v) => set((s) => ({ isGroupModalOpen: typeof v === 'function' ? v(s.isGroupModalOpen) : v })),
+  setSettingsOpen: (v) => set((s) => ({ isSettingsOpen: typeof v === 'function' ? v(s.isSettingsOpen) : v })),
+  setCreateProjectOpen: (v) => set((s) => ({ isCreateProjectOpen: typeof v === 'function' ? v(s.isCreateProjectOpen) : v })),
+  setOrchestratorOpen: (v) => set((s) => ({ isOrchestratorOpen: typeof v === 'function' ? v(s.isOrchestratorOpen) : v })),
 }));

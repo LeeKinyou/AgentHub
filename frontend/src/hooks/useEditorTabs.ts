@@ -46,6 +46,12 @@ export function useEditorTabs() {
         return;
       }
       try {
+        const opts = { mode: 'read' as const };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const h = handle as any;
+        let perm = await h.queryPermission(opts);
+        if (perm !== 'granted') perm = await h.requestPermission(opts);
+        if (perm !== 'granted') throw new DOMException('Permission denied', 'NotAllowedError');
         const file = await handle.getFile();
         const content = await file.text();
         const id = crypto.randomUUID();

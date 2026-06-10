@@ -28,6 +28,7 @@ export function useProjectState() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(() => loadFromStorage(KEYS.activeProjectId, null));
   const [activeSessionId, setActiveSessionId] = useState<string | null>(() => loadFromStorage(KEYS.activeSessionId, null));
   const [realFileTrees, setRealFileTrees] = useState<Record<string, FileNode>>({});
+  const [needsReauth, setNeedsReauth] = useState<Record<string, boolean>>({});
 
   useEffect(() => { localStorage.setItem(KEYS.projects, JSON.stringify(projects)); }, [projects]);
   useEffect(() => { localStorage.setItem(KEYS.activeProjectId, JSON.stringify(activeProjectId)); }, [activeProjectId]);
@@ -48,9 +49,15 @@ export function useProjectState() {
           const dirHandle = await getDirHandle(proj.id);
           if (dirHandle && !cancelled) {
             const children = await traverseDirectory(dirHandle);
-            if (!cancelled && children.length > 0) {
-              const tree: FileNode = { name: dirHandle.name, type: 'dir', children, dirHandle };
-              setRealFileTrees((prev) => ({ ...prev, [proj.id]: tree }));
+            if (!cancelled) {
+              if (children.length > 0) {
+                const tree: FileNode = { name: dirHandle.name, type: 'dir', children, dirHandle };
+                setRealFileTrees((prev) => ({ ...prev, [proj.id]: tree }));
+                setNeedsReauth((prev) => { const next = { ...prev }; delete next[proj.id]; return next; });
+              } else {
+                // Directory handle exists but permission lost — mark for re-auth
+                setNeedsReauth((prev) => ({ ...prev, [proj.id]: true }));
+              }
             }
           }
         } catch { /* ignore */ }
@@ -74,6 +81,7 @@ export function useProjectState() {
   const handleDeleteProject = useCallback((projectId: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== projectId));
     setRealFileTrees((prev) => { const next = { ...prev }; delete next[projectId]; return next; });
+    setNeedsReauth((prev) => { const next = { ...prev }; delete next[projectId]; return next; });
     if (activeProjectId === projectId) { setActiveProjectId(null); setActiveSessionId(null); }
     deleteDirHandle(projectId).catch(() => {});
   }, [activeProjectId]);
@@ -256,8 +264,8 @@ export function useProjectState() {
   }, [activeProjectId, updateFileTree]);
 
   return {
-    projects, activeProjectId, activeSessionId, activeProject, activeSession, activeFileTree,
-    setActiveSessionId, setRealFileTrees, handleSelectProject, handleDeleteProject,
+    projects, activeProjectId, activeSessionId, activeProject, activeSession, activeFileTree, needsReauth,
+    setActiveSessionId, setRealFileTrees, setNeedsReauth, handleSelectProject, handleDeleteProject,
     handleDeleteSession, handleOpenProject, handleNewProject, createProject, handleOpenFile, handleCreateSession, handleCreateGroup, handleFileAction,
     handleTogglePinSession, handleToggleArchiveSession, updateSessionMeta,
     updateFileTree,
