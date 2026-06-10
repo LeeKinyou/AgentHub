@@ -176,6 +176,42 @@ backend/tests/
 - 遵循现有的组件结构
 - 使用从 `shared/schemas/` 生成的类型（不要手动定义契约中已有的类型）
 
+## AI 协作标记规范
+
+本项目采用人机协作开发模式。为清晰记录每个 commit 的人机分工，所有 commit message 需遵循以下标记规范：
+
+### 标记格式
+
+在 commit message 末尾添加以下标记之一：
+
+```
+feat(backend): add JWT authentication [AI Co-authored]
+fix(websocket): handle disconnect race condition [AI Guided]
+chore: update dependencies [Human]
+```
+
+### 标记说明
+
+| 标记 | 含义 | 使用场景 |
+|------|------|----------|
+| `[AI Co-authored]` | AI 生成主体代码，人类决策架构 | AI 根据需求生成核心实现，人类审查并调整 |
+| `[AI Guided]` | AI 提供建议/审查，人类实现 | AI 发现问题或提出方案，人类编写代码 |
+| `[Human]` | 纯人类操作 | 手动配置、merge、解决冲突等 |
+
+### 示例
+
+```
+feat(backend): implement multi-agent parallel execution [AI Co-authored]
+  - Topological sort for dependency graph
+  - asyncio.gather for parallel agent dispatch
+  
+fix(backend): security hardening - sanitize error messages [AI Guided]
+  - Replace raw exception messages with generic errors
+  - Add MCP command whitelist
+
+Merge pull request #20 from LeeKinyou/kinyou_dev [Human]
+```
+
 ## 项目结构
 
 ```

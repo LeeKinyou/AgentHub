@@ -142,3 +142,194 @@
    - 依赖：前置任务编号
    - 产出：预期交付物
 ```
+
+---
+
+## 五、人机协作深度场景
+
+### 5.1 Orchestrator 任务规划 Prompt
+
+**场景**：用户在群聊中输入复杂需求，Orchestrator 需要拆解为多 Agent 协作计划。
+
+**人类输入**：
+```
+我需要为这个项目添加用户认证功能，包括注册、登录、JWT token 管理，
+以及中间件保护路由。请规划执行方案。
+
+可用 Agent 名册：
+- Claude (expert): 擅长代码生成与架构设计
+- Codex (expert): 擅长代码补全与重构
+- SecurityBot (expert): 擅长安全审计与漏洞检测
+```
+
+**AI 输出摘要**：
+```json
+{
+  "plan": "用户认证系统实现",
+  "steps": [
+    {
+      "id": 1,
+      "agent": "Claude",
+      "task": "设计 User 模型和认证 Schema",
+      "output": "models/user.py, schemas/auth.py",
+      "dependencies": []
+    },
+    {
+      "id": 2,
+      "agent": "Claude",
+      "task": "实现 JWT encode/decode + bcrypt 密码哈希",
+      "output": "core/security.py",
+      "dependencies": [1]
+    },
+    {
+      "id": 3,
+      "agent": "Codex",
+      "task": "实现认证路由 register/login/refresh/logout",
+      "output": "routes/auth.py",
+      "dependencies": [1, 2]
+    },
+    {
+      "id": 4,
+      "agent": "SecurityBot",
+      "task": "审查认证实现的安全性",
+      "output": "安全审查报告",
+      "dependencies": [3]
+    }
+  ]
+}
+```
+
+**人机迭代**：
+- 人类审查：建议将 SecurityBot 审查提前到路由实现之前，避免返工
+- AI 调整：重新编排依赖图，让 SecurityBot 在 step 2 完成后即审查 core/security.py
+- 人类确认：执行调整后的计划
+
+### 5.2 安全审查 Prompt
+
+**场景**：让 AI 审查 WebSocket 路由代码中的安全漏洞。
+
+**人类输入**：
+```
+请审查以下 WebSocket 路由代码的安全性，重点关注：
+1. 认证与授权
+2. 输入校验
+3. Rate limiting
+4. 资源消耗防护
+
+代码路径：backend/app/routes/websocket.py
+
+```python
+@router.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    await websocket.accept()
+    # ... 处理消息
+```
+```
+
+**AI 输出摘要**：
+发现 3 个安全问题：
+1. **缺少认证**：WebSocket 连接未验证 JWT token，任何人可连接
+2. **缺少 Rate Limiting**：无消息频率限制，可被 Flood 攻击
+3. **session_id 未校验**：未验证 session_id 格式（应为 UUID）且未检查用户是否有权访问该 session
+
+建议修复：
+- 在 accept() 前验证 token
+- 添加消息计数器 + 滑动窗口限流
+- 使用 Pydantic 校验 session_id 格式
+
+**人机迭代**：
+- 人类反馈：除了修复，还需要添加连接数上限（每个用户最多 5 个并发连接）
+- AI 补充：在连接管理器中添加 per-user 连接计数，超出时返回 429
+
+### 5.3 架构设计 Spec 协作 Prompt
+
+**场景**：人类提出需求，AI 输出架构 Spec，经过多轮迭代确定方案。
+
+**人类输入**：
+```
+设计一个可插拔的多 Agent 调度器，要求：
+1. 支持单 Agent 直接执行和多 Agent 并行执行
+2. Agent 之间可以有依赖关系（如 Agent B 需要 Agent A 的输出）
+3. 支持动态添加新的 Agent 类型（适配器模式）
+4. 执行过程需要实时推送到前端
+
+请先输出架构设计 Spec，我来审查。
+```
+
+**AI 输出 Spec 摘要**：
+```
+## Orchestrator 架构 Spec
+
+### 核心组件
+- AgentRegistry: 管理所有已注册的 Agent 适配器
+- ExecutionPlanner: LLM 驱动的任务规划器
+- DependencyGraph: DAG 依赖图 + 拓扑排序
+- TaskExecutor: 异步任务执行器（asyncio.gather 并行）
+
+### 数据流
+用户消息 → Orchestrator.analyze_intent()
+  → LLM 生成 JSON 执行计划
+  → 构建 DependencyGraph
+  → 拓扑排序得到执行层级
+  → 每层 Agent 并行执行
+  → 结果聚合 → 推送前端
+```
+
+**人机迭代**：
+- 第一轮：人类指出缺少错误恢复机制（某个 Agent 失败不应阻塞整个流程）
+- AI 更新：添加 fallback 策略 — 单个 Agent 超时/失败时跳过并记录，不阻塞后续步骤
+- 第二轮：人类要求支持 Agent 间消息传递（不只是依赖输出）
+- AI 更新：添加 AgentMessageBus，Agent 可以 publish/subscribe 消息通道
+
+### 5.4 UI 组件设计 Prompt
+
+**场景**：用 AI 生成符合苹果极简风格的 UI 组件。
+
+**人类输入**：
+```
+设计一个消息卡片组件 MessageCard，遵循以下 UI 规范：
+
+## 设计规范
+- 核心理念：少即是多，克制是最高级的美感
+- 禁止：霓虹渐变、发光效果、厚重阴影、大圆角
+- 色彩：背景纯白 #FFFFFF，主文本 #1D1D1F，辅助 #86868B
+- 强调色：仅 #0071E3，极度克制
+- 边框：极浅灰 #D2D2D7，仅 1px
+- 字体：-apple-system 栈，行高 1.5-1.6
+- 动效：transition-all duration-300 ease-in-out，仅允许淡入
+
+## 功能需求
+- 区分用户消息（右对齐，蓝色气泡）和 Agent 消息（左对齐，白色气泡）
+- 支持 Markdown 渲染
+- 支持代码块缩略展示
+- hover 时显示操作栏（复制、回复、引用、Pin）
+
+请输出 React + Tailwind 组件代码。
+```
+
+**AI 输出摘要**：
+```tsx
+// 核心结构
+<div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+  <div className="w-8 h-8 rounded-full bg-minimal-bg border border-minimal-border
+    flex items-center justify-center text-sm shrink-0">
+    {sender.avatar}
+  </div>
+  <div className={`max-w-[75%] ...`}>
+    <div className="px-3 py-2 rounded-lg text-sm
+      ${isUser ? 'bg-minimal-accent text-white'
+               : 'bg-white/80 backdrop-blur-sm border border-minimal-border ...'}">
+      <MarkdownRenderer content={textContent} />
+    </div>
+    {/* 操作栏 — hover 渐显 */}
+    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+      {/* 复制 · 回复 · 引用 · Pin */}
+    </div>
+  </div>
+</div>
+```
+
+**人机迭代**：
+- 人类反馈：操作栏的 translate-y 动画太明显，改为仅 opacity 变化
+- AI 调整：移除 translate-y class，仅保留 opacity-0 → opacity-100
+- 人类确认：符合克制风格，通过
