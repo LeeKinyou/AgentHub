@@ -111,10 +111,7 @@ export function OrchestratorStatusCard({ status, steps, currentStep, errorMessag
                     <p className="text-xs text-minimal-secondary mt-0.5 font-mono">{step.description}</p>
                   </div>
                   {step.status === 'running' && (
-                    <svg className="w-3.5 h-3.5 text-minimal-accent animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
+                    <span className="w-3.5 h-3.5 rounded-full bg-minimal-accent animate-pulse shrink-0" />
                   )}
                 </div>
               ))}
@@ -139,9 +136,9 @@ export function OrchestratorStatusCard({ status, steps, currentStep, errorMessag
           {status === 'dispatching' && (
             <div className="flex items-center gap-2 text-[11px] text-minimal-secondary font-mono">
               <span className="flex gap-1">
-                <span className="w-1 h-1 rounded-full bg-minimal-accent animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1 h-1 rounded-full bg-minimal-accent animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1 h-1 rounded-full bg-minimal-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1 h-1 rounded-full bg-minimal-accent animate-pulse" style={{ animationDelay: '0ms' }} />
+                <span className="w-1 h-1 rounded-full bg-minimal-accent animate-pulse" style={{ animationDelay: '150ms' }} />
+                <span className="w-1 h-1 rounded-full bg-minimal-accent animate-pulse" style={{ animationDelay: '300ms' }} />
               </span>
               正在并行调度子 Agent...
             </div>

@@ -31,10 +31,7 @@ export function ProcessingIndicator({ status, onStop, onRetry }: ProcessingIndic
       )}
       {status.status === 'processing' && (
         <>
-          <svg className="w-3 h-3 text-minimal-warning animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
+          <span className="w-3 h-3 rounded-full bg-minimal-warning animate-pulse" />
           <span className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary font-mono">{status.displayText ?? '正在处理...'}</span>
           {onStop && (
             <button onClick={onStop} className="ml-1 px-1.5 py-0.5 text-[10px] font-mono text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-error bg-minimal-bg dark:bg-minimal-dark-bg hover:bg-minimal-error/5 rounded-minimal transition-colors duration-200" title="停止生成">
