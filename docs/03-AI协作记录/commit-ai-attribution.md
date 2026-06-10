@@ -61,7 +61,22 @@
 | `26ece4f` | fix | P0 安全修复 — 凭据外部化 + API Key 脱敏 | 安全审查 | 修复实现 | [AI Guided] |
 | `3d32a75` | refactor | 重构控制台面板与布局 + 设置弹窗 | UI 架构 | 代码重构 | [AI Co-authored] |
 
+### 2026-06-10 新增 commit（实时标记）
+
+| Commit | 类型 | 描述 | 人类决策 | AI 贡献 | 标记 |
+|--------|------|------|----------|---------|------|
+| `b8c1128` | feat | 契约层更新 — entities 扩展 + WS 消息协议增强 | 契约设计 | Schema + 类型生成 | [AI Co-authored] |
+| `afa4a84` | feat | WebSocket 流式增强 + 文件上传 + CustomAdapter MCP | 架构决策 | 代码实现 | [AI Co-authored] |
+| `fe39cec` | refactor | Zustand 状态管理 + useAppState 统一协调层 | 状态架构 | 代码重构 | [AI Co-authored] |
+| `8ab5e8d` | feat | 核心布局重构 + 消息气泡组件提取 | 组件拆分 | 代码实现 | [AI Co-authored] |
+| `43926b8` | feat | 全组件 dark mode 适配 + 创新组件接入 | 设计方向 | 样式 + 组件实现 | [AI Co-authored] |
+| `e783efb` | docs | AI 协作归因记录 + 前端组件文档 + 贡献指南更新 | 文档规划 | 内容生成 | [AI Guided] |
+| `92310f1` | test | Playwright E2E 测试框架搭建 | 测试策略 | 配置 + 用例实现 | [AI Co-authored] |
+| `9c58f07` | chore | 移除临时截图文件 | 文件清理 | — | [Human] |
+
 ## 统计摘要
+
+### 历史 commit（事后归因）
 
 | 标记 | 数量 | 占比 |
 |------|------|------|
@@ -69,4 +84,21 @@
 | [AI Guided] | 14 | 36% |
 | [Human] | 3 | 8% |
 
-> 以上归因基于 commit 内容与开发过程分析，反映人机协作的实际分工模式。
+### 新 commit（实时标记，2026-06-10 起）
+
+| 标记 | 数量 | 占比 |
+|------|------|------|
+| [AI Co-authored] | 6 | 75% |
+| [AI Guided] | 1 | 12.5% |
+| [Human] | 1 | 12.5% |
+
+### 合计
+
+| 标记 | 数量 | 占比 |
+|------|------|------|
+| [AI Co-authored] | 28 | 57% |
+| [AI Guided] | 15 | 31% |
+| [Human] | 4 | 8% |
+| **总计** | **47** | **100%** |
+
+> 历史 commit 归因基于 commit 内容与开发过程分析；新 commit 标记已直接写入 git commit message，可通过 `git log` 验证。
