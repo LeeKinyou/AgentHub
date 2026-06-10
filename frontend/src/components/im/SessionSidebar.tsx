@@ -19,6 +19,7 @@ function SessionItem({ session, activeId, onSelect, onDelete, onPin, onArchive }
   return (
     <div className="group relative">
       <button onClick={() => onSelect(session.id)}
+        data-testid={`session-item-${session.id}`}
         className={`w-full text-left px-3 py-2 rounded-minimal transition-colors duration-300 border-l-2 ${session.id === activeId ? 'bg-minimal-accent/5 text-minimal-text border-minimal-accent' : 'text-minimal-secondary hover:bg-minimal-bg hover:text-minimal-text border-transparent'}`}>
         <div className="flex items-center gap-2">
           {session.type === 'group' && session.agentIds.length > 0 && <AvatarStack agentIds={session.agentIds} />}
@@ -55,7 +56,7 @@ function SessionItem({ session, activeId, onSelect, onDelete, onPin, onArchive }
   );
 }
 
-function SectionHeader({ label, expanded, onToggle, onAdd, addTitle }: { label: string; expanded: boolean; onToggle: () => void; onAdd?: () => void; addTitle?: string }) {
+function SectionHeader({ label, expanded, onToggle, onAdd, addTitle, testId }: { label: string; expanded: boolean; onToggle: () => void; onAdd?: () => void; addTitle?: string; testId?: string }) {
   return (
     <div className="px-3 py-1.5 flex items-center justify-between">
       <button onClick={onToggle} className="flex items-center gap-1 min-w-0">
@@ -63,7 +64,7 @@ function SectionHeader({ label, expanded, onToggle, onAdd, addTitle }: { label: 
         <span className="text-[10px] font-medium text-minimal-secondary uppercase tracking-wider truncate">{label}</span>
       </button>
       {onAdd && (
-        <button onClick={onAdd} className="w-5 h-5 flex items-center justify-center rounded hover:bg-minimal-bg text-minimal-tertiary hover:text-minimal-text transition-colors duration-300 shrink-0" title={addTitle}>
+        <button onClick={onAdd} data-testid={testId} className="w-5 h-5 flex items-center justify-center rounded hover:bg-minimal-bg text-minimal-tertiary hover:text-minimal-text transition-colors duration-300 shrink-0" title={addTitle}>
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
         </button>
       )}
@@ -128,7 +129,7 @@ export function SessionSidebar({ sessions, activeId, onSelect, onPlusClick, onOp
       </div>
       <nav className="flex-1 overflow-y-auto px-2 pb-2 space-y-3 scrollbar-thin scrollbar-thumb-zinc-300">
         <div>
-          <SectionHeader label="💬 单聊模式 (Direct)" expanded={isDirectExpanded} onToggle={() => setIsDirectExpanded((p) => !p)} onAdd={onPlusClick} addTitle="新建单聊" />
+          <SectionHeader label="💬 单聊模式 (Direct)" expanded={isDirectExpanded} onToggle={() => setIsDirectExpanded((p) => !p)} onAdd={onPlusClick} addTitle="新建单聊" testId="add-single-chat" />
           {isDirectExpanded && (
             <div className="space-y-0.5">
               {directSessions.length === 0 && <p className="px-3 py-2 text-[11px] text-minimal-tertiary italic">{searchQuery ? '无匹配结果' : '暂无单聊会话'}</p>}
@@ -137,7 +138,7 @@ export function SessionSidebar({ sessions, activeId, onSelect, onPlusClick, onOp
           )}
         </div>
         <div>
-          <SectionHeader label="🤖 群聊协作 (Groups)" expanded={isGroupsExpanded} onToggle={() => setIsGroupsExpanded((p) => !p)} onAdd={onOpenGroupModal} addTitle="创建群组" />
+          <SectionHeader label="🤖 群聊协作 (Groups)" expanded={isGroupsExpanded} onToggle={() => setIsGroupsExpanded((p) => !p)} onAdd={onOpenGroupModal} addTitle="创建群组" testId="add-group-chat" />
           {isGroupsExpanded && (
             <div className="space-y-0.5">
               {groupSessions.length === 0 && <p className="px-3 py-2 text-[11px] text-minimal-tertiary italic">{searchQuery ? '无匹配结果' : '暂无群聊会话'}</p>}

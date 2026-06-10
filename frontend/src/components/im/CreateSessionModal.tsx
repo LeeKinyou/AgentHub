@@ -31,7 +31,7 @@ export function CreateSessionModal({ isOpen, onClose, onConfirm, availableAgents
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose} data-testid="create-session-modal">
       <div className="bg-minimal-glass/80 dark:bg-minimal-dark-surface/80 backdrop-blur-xl border border-minimal-glass-border dark:border-minimal-dark-border p-6 rounded-minimal w-[420px] shadow-minimal-glass shadow-minimal-glow" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold text-minimal-text dark:text-minimal-dark-text mb-4">创建新会话</h3>
         <input
@@ -40,6 +40,7 @@ export function CreateSessionModal({ isOpen, onClose, onConfirm, availableAgents
           onChange={(e) => setName(e.target.value)}
           placeholder="自定义会话名称（可选）"
           className="w-full px-3 py-2 mb-4 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-minimal text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary dark:placeholder-minimal-dark-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300"
+          data-testid="session-name-input"
         />
         <p className="text-xs text-minimal-secondary dark:text-minimal-dark-secondary mb-2">选择参与的智能体：</p>
         {availableAgents.length === 0 ? (
@@ -53,6 +54,7 @@ export function CreateSessionModal({ isOpen, onClose, onConfirm, availableAgents
             <button
               key={agent.id}
               onClick={() => toggleAgent(agent.id)}
+              data-testid={`agent-option-${agent.id}`}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-minimal border transition-colors duration-300 ${
                 selectedIds.includes(agent.id)
                   ? 'bg-minimal-accent/5 border-minimal-accent'
@@ -85,6 +87,7 @@ export function CreateSessionModal({ isOpen, onClose, onConfirm, availableAgents
             onClick={handleConfirm}
             disabled={selectedIds.length === 0}
             className="px-4 py-2 text-sm bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border dark:disabled:bg-minimal-dark-border disabled:text-minimal-tertiary dark:disabled:text-minimal-dark-tertiary text-white rounded-minimal transition-colors duration-300"
+            data-testid="confirm-create-session"
           >
             确认创建
           </button>

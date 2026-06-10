@@ -1,7 +1,8 @@
 'use client';
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react';
 import type { AgentProfile } from '@agenthub/shared/types/entities';
 import { MentionList } from './MentionList';
+import { apiClient } from '@/lib/api';
 
 export interface ContextItem {
   id: string;
@@ -22,6 +23,7 @@ interface InputContextAreaProps {
   onSend: (text: string) => void;
   onDropFile?: (fileName: string) => void;
   onDropExternalFiles?: (files: FileList) => void;
+  onFileUploaded?: (file: { url: string; filename: string; size: number; mimeType: string }) => void;
   replyToId?: string | null;
   onClearReply?: () => void;
 }
@@ -49,7 +51,7 @@ function ContextChipsBar({ items, onRemove }: { items: ContextItem[]; onRemove: 
   );
 }
 
-export function InputContextArea({ agents, contextItems, onRemoveContext, onSend, onDropFile, onDropExternalFiles, replyToId, onClearReply }: InputContextAreaProps) {
+export function InputContextArea({ agents, contextItems, onRemoveContext, onSend, onDropFile, onDropExternalFiles, onFileUploaded, replyToId, onClearReply }: InputContextAreaProps) {
   const [text, setText] = useState('');
   const [mentionKey, setMentionKey] = useState('');
   const [isMentionOpen, setIsMentionOpen] = useState(false);
@@ -57,7 +59,22 @@ export function InputContextArea({ agents, contextItems, onRemoveContext, onSend
   const [isSlashOpen, setIsSlashOpen] = useState(false);
   const [slashIdx, setSlashIdx] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const result = await apiClient.uploadFile(file);
+        if (result.data) onFileUploaded?.(result.data);
+      }
+    } finally {
+      setIsUploading(false);
+    }
+  }, [onFileUploaded]);
   const filteredAgents = agents.filter((a) => a.name.toLowerCase().includes(mentionKey.toLowerCase()));
   const filteredCmds = SLASH_COMMANDS.filter((c) => c.label.includes(text.match(/\/\w*$/)?.[0] ?? ''));
   useEffect(() => {
@@ -148,13 +165,25 @@ export function InputContextArea({ agents, contextItems, onRemoveContext, onSend
           onKeyDown={handleKeyDown}
           placeholder="输入消息..."
           rows={1}
-          className="flex-1 px-4 py-2 bg-minimal-bg border border-minimal-border rounded-minimal text-sm text-minimal-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-all duration-300 resize-none min-h-[38px] max-h-[120px]"
+          data-testid="message-input"
+          className="flex-1 px-4 py-2 bg-minimal-bg border border-minimal-border rounded-minimal text-sm text-minimal-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-200 resize-none min-h-[38px] max-h-[120px]"
           style={{ height: Math.min(120, Math.max(38, text.split('\n').length * 24)) }}
         />
+        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files)} />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          title="附件"
+          className="px-3 py-2 border border-minimal-border rounded-minimal text-minimal-secondary hover:text-minimal-text hover:bg-minimal-bg transition-colors duration-200 disabled:opacity-50 self-end"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+        </button>
         <button
           onClick={() => { const trimmed = text.trim(); if (trimmed) { onSend(trimmed); setText(''); } }}
           disabled={!text.trim()}
-          className="px-4 py-2 bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border disabled:text-minimal-tertiary text-white text-sm rounded-minimal transition-colors duration-300 self-end"
+          data-testid="send-button"
+          className="px-4 py-2 bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border disabled:text-minimal-tertiary text-white text-sm rounded-minimal transition-colors duration-200 self-end"
         >
           发送
         </button>

@@ -30,7 +30,7 @@ export function CreateGroupModal({ isOpen, onClose, availableAgents, onCreate }:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose} data-testid="create-group-modal">
       <div className="bg-minimal-glass/80 dark:bg-minimal-dark-surface/80 backdrop-blur-xl border border-minimal-glass-border dark:border-minimal-dark-border p-6 rounded-minimal w-[440px] shadow-minimal-glass shadow-minimal-glow" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-semibold text-minimal-text dark:text-minimal-dark-text mb-4">创建专家群组</h3>
         <input
@@ -39,6 +39,7 @@ export function CreateGroupModal({ isOpen, onClose, availableAgents, onCreate }:
           onChange={(e) => setGroupName(e.target.value)}
           placeholder="请输入专案群组名称..."
           className="w-full px-4 py-2 mb-4 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-minimal text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary dark:placeholder-minimal-dark-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300"
+          data-testid="group-name-input"
         />
         <p className="text-xs text-minimal-secondary dark:text-minimal-dark-secondary mb-2">选择要拉入群组的智能体（至少 2 位）：</p>
         {availableAgents.length === 0 ? (
@@ -52,6 +53,7 @@ export function CreateGroupModal({ isOpen, onClose, availableAgents, onCreate }:
             <button
               key={agent.id}
               onClick={() => toggleAgent(agent.id)}
+              data-testid={`group-agent-${agent.id}`}
               className={`w-full flex items-center gap-3 p-3 rounded-minimal border transition-colors duration-300 ${
                 selectedAgentIds.includes(agent.id)
                   ? 'bg-minimal-accent/5 border-minimal-accent'
@@ -82,6 +84,7 @@ export function CreateGroupModal({ isOpen, onClose, availableAgents, onCreate }:
             onClick={handleCreate}
             disabled={!canSubmit}
             className="px-4 py-2 text-sm bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border dark:disabled:bg-minimal-dark-border disabled:text-minimal-tertiary dark:disabled:text-minimal-dark-tertiary text-white rounded-minimal transition-colors duration-300"
+            data-testid="confirm-create-group"
           >
             创建群组
           </button>

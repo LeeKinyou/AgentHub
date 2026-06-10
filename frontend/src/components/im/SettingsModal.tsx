@@ -29,12 +29,12 @@ export function SettingsModal({ isOpen, onClose, agents, onAddAgent, onUpdateAge
   const [tab, setTab] = useState<TabKey>('agents');
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose} data-testid="settings-modal">
       <div className="bg-white dark:bg-minimal-dark-surface border border-minimal-border dark:border-minimal-dark-border rounded-xl w-[720px] max-h-[85vh] flex overflow-hidden shadow-minimal-md" onClick={(e) => e.stopPropagation()}>
         <aside className="w-48 shrink-0 bg-minimal-bg dark:bg-minimal-dark-bg border-r border-minimal-border dark:border-minimal-dark-border p-3 space-y-0.5">
           <p className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary font-medium px-3 mb-2">设置</p>
           {TABS.map((t) => (
-            <button key={t.key} onClick={() => setTab(t.key)} className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2.5 transition-colors duration-300 ${tab === t.key ? 'bg-white dark:bg-minimal-dark-surface text-minimal-text dark:text-minimal-dark-text shadow-sm' : 'text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text hover:bg-white/60 dark:hover:bg-white/5'}`}>
+            <button key={t.key} onClick={() => setTab(t.key)} data-testid={`settings-tab-${t.key}`} className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2.5 transition-colors duration-300 ${tab === t.key ? 'bg-white dark:bg-minimal-dark-surface text-minimal-text dark:text-minimal-dark-text shadow-sm' : 'text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text hover:bg-white/60 dark:hover:bg-white/5'}`}>
               {t.icon}
               {t.label}
             </button>

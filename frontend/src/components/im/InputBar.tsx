@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useCallback, type FormEvent, type KeyboardEvent } from 'react';
 import type { AgentProfile } from '@agenthub/shared/types/entities';
 import { MentionList } from './MentionList';
+import { apiClient } from '@/lib/api';
 
 const SETTINGS_KEY = 'agenthub_general_settings';
 
@@ -17,19 +18,48 @@ function getSendTrigger(): string {
 interface InputBarProps {
   agents: AgentProfile[];
   onSend: (text: string) => void;
+  onFileUploaded?: (file: { url: string; filename: string; size: number; mimeType: string }) => void;
 }
 
-export function InputBar({ agents, onSend }: InputBarProps) {
+export function InputBar({ agents, onSend, onFileUploaded }: InputBarProps) {
   const [text, setText] = useState('');
   const [mentionKey, setMentionKey] = useState('');
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const [sendTrigger, setSendTrigger] = useState(getSendTrigger);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const filteredAgents = agents.filter((a) =>
     a.name.toLowerCase().includes(mentionKey.toLowerCase())
   );
+
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const result = await apiClient.uploadFile(file);
+        if (result.data) {
+          onFileUploaded?.(result.data);
+        }
+      }
+    } finally {
+      setIsUploading(false);
+    }
+  }, [onFileUploaded]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleFileSelect(e.dataTransfer.files);
+  }, [handleFileSelect]);
 
   // Re-read setting when settings change
   useEffect(() => {
@@ -115,7 +145,7 @@ export function InputBar({ agents, onSend }: InputBarProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative p-4 border-t border-minimal-glass-border dark:border-minimal-dark-border bg-minimal-glass/30 dark:bg-minimal-dark-surface/30 backdrop-blur-xl shrink-0">
+    <form onSubmit={handleSubmit} onDragOver={handleDragOver} onDrop={handleDrop} className="relative p-4 border-t border-minimal-glass-border dark:border-minimal-dark-border bg-minimal-glass/30 dark:bg-minimal-dark-surface/30 backdrop-blur-xl shrink-0">
       <MentionList
         agents={filteredAgents}
         isOpen={isMentionOpen}
@@ -133,12 +163,24 @@ export function InputBar({ agents, onSend }: InputBarProps) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="输入消息..."
-          className="flex-1 px-4 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-minimal text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary dark:placeholder-minimal-dark-tertiary focus:outline-none focus:border-minimal-accent transition-all duration-300"
+          data-testid="message-input"
+          className="flex-1 px-4 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-minimal text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary dark:placeholder-minimal-dark-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-200"
         />
+        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFileSelect(e.target.files)} />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          title="附件"
+          className="px-3 py-2 border border-minimal-border dark:border-minimal-dark-border rounded-minimal text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text hover:bg-minimal-bg dark:hover:bg-minimal-dark-bg transition-colors duration-200 disabled:opacity-50"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+        </button>
         <button
           type="submit"
           disabled={!text.trim()}
-          className="px-4 py-2 bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border dark:disabled:bg-minimal-dark-border disabled:text-minimal-tertiary dark:disabled:text-minimal-dark-tertiary text-white text-sm rounded-minimal transition-colors duration-300"
+          data-testid="send-button"
+          className="px-4 py-2 bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border dark:disabled:bg-minimal-dark-border disabled:text-minimal-tertiary dark:disabled:text-minimal-dark-tertiary text-white text-sm rounded-minimal transition-colors duration-200"
         >
           发送
         </button>

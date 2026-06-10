@@ -36,8 +36,18 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
             return <code className={className} {...props}>{children}</code>;
           },
           pre: ({ children }) => (
-            <div className="my-2 rounded-lg overflow-hidden border border-minimal-border dark:border-minimal-dark-border">
+            <div className="group relative my-2 rounded-lg overflow-hidden border border-minimal-border dark:border-minimal-dark-border">
               <pre className="p-3 bg-minimal-bg dark:bg-minimal-dark-bg overflow-x-auto text-[13px] font-mono whitespace-pre">{children}</pre>
+              <button
+                onClick={() => {
+                  const codeEl = document.querySelector('.group pre code');
+                  if (codeEl) navigator.clipboard.writeText(codeEl.textContent ?? '');
+                }}
+                className="absolute top-2 right-2 p-1.5 rounded bg-white/80 dark:bg-minimal-dark-surface/80 backdrop-blur border border-minimal-border dark:border-minimal-dark-border text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                title="Copy"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" strokeWidth="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeWidth="2"/></svg>
+              </button>
             </div>
           ),
           blockquote: ({ children }) => (

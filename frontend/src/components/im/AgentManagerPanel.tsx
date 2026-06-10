@@ -4,11 +4,11 @@ import { useState } from 'react';
 import type { AgentProfileRead } from '@/lib/api';
 
 const PROVIDERS = [
-  { value: 'openai', label: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1-preview'] },
-  { value: 'anthropic', label: 'Anthropic', models: ['claude-sonnet-4-20250514', 'claude-3.5-haiku', 'claude-3-opus'] },
-  { value: 'deepseek', label: 'DeepSeek', models: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'] },
-  { value: 'ollama', label: 'Ollama', models: ['llama3.1', 'qwen2.5', 'codellama', 'mistral'] },
-  { value: 'custom', label: 'Custom', models: ['custom-model'] },
+  { value: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1-preview'] },
+  { value: 'anthropic', label: 'Anthropic', baseUrl: 'https://api.anthropic.com', models: ['claude-sonnet-4-20250514', 'claude-3.5-haiku', 'claude-3-opus'] },
+  { value: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com', models: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'] },
+  { value: 'ollama', label: 'Ollama', baseUrl: 'http://localhost:11434/v1', models: ['llama3.1', 'qwen2.5', 'codellama', 'mistral'] },
+  { value: 'custom', label: 'Custom (OpenAI 兼容)', baseUrl: '', models: [] },
 ];
 
 const TOOLS = [
@@ -28,13 +28,15 @@ interface FormData {
   name: string;
   description: string;
   provider: string;
+  baseUrl: string;
   model: string;
+  customModelName: string;
   apiKey: string;
   prompt: string;
   tools: string[];
 }
 
-const emptyForm: FormData = { name: '', description: '', provider: 'openai', model: PROVIDERS[0].models[0], apiKey: '', prompt: '', tools: [] };
+const emptyForm: FormData = { name: '', description: '', provider: 'openai', baseUrl: PROVIDERS[0].baseUrl, model: PROVIDERS[0].models[0], customModelName: '', apiKey: '', prompt: '', tools: [] };
 
 function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
@@ -60,7 +62,8 @@ function AgentForm({ form, setForm, onSave, onCancel, isLoading, submitLabel }: 
 }) {
   const [showAdv, setShowAdv] = useState(false);
   const cur = PROVIDERS.find((p) => p.value === form.provider) ?? PROVIDERS[0];
-  const canSubmit = form.name.trim().length > 0 && form.apiKey.trim().length > 0;
+  const effectiveModel = form.customModelName.trim() || form.model;
+  const canSubmit = form.name.trim().length > 0 && form.apiKey.trim().length > 0 && effectiveModel.length > 0 && form.baseUrl.trim().length > 0;
 
   const update = (patch: Partial<FormData>) => setForm({ ...form, ...patch });
   const toggleTool = (id: string) => update({ tools: form.tools.includes(id) ? form.tools.filter((t) => t !== id) : [...form.tools, id] });
@@ -70,29 +73,42 @@ function AgentForm({ form, setForm, onSave, onCancel, isLoading, submitLabel }: 
       <div className="space-y-3">
         <div>
           <label className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 block">名称</label>
-          <input value={form.name} onChange={(e) => update({ name: e.target.value })} placeholder="My Agent" className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300" />
+          <input value={form.name} onChange={(e) => update({ name: e.target.value })} placeholder="My Agent" data-testid="agent-name-input" className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300" />
         </div>
         <div>
           <label className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 block">描述</label>
-          <input value={form.description} onChange={(e) => update({ description: e.target.value })} placeholder="该智能体的职责说明" className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300" />
+          <input value={form.description} onChange={(e) => update({ description: e.target.value })} placeholder="该智能体的职责说明" data-testid="agent-description-input" className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300" />
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 block">服务商</label>
+            <select value={form.provider} onChange={(e) => { const p = PROVIDERS.find((p) => p.value === e.target.value) ?? PROVIDERS[0]; update({ provider: e.target.value, baseUrl: p.baseUrl, model: p.models[0] ?? '', customModelName: '' }); }} className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text focus:outline-none focus:border-minimal-accent transition-colors duration-300">
+              {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 block">API Key</label>
+            <input type="password" value={form.apiKey} onChange={(e) => update({ apiKey: e.target.value })} placeholder="sk-..." data-testid="agent-apikey-input" className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300" />
+          </div>
+        </div>
         <div>
-          <label className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 block">服务商</label>
-          <select value={form.provider} onChange={(e) => update({ provider: e.target.value, model: PROVIDERS.find((p) => p.value === e.target.value)?.models[0] ?? '' })} className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text focus:outline-none focus:border-minimal-accent transition-colors duration-300">
-            {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
+          <label className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 block">API Base URL</label>
+          <input value={form.baseUrl} onChange={(e) => update({ baseUrl: e.target.value })} placeholder="https://api.openai.com/v1" data-testid="agent-baseurl-input" className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300 font-mono text-xs" />
         </div>
         <div>
           <label className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 block">模型</label>
-          <select value={form.model} onChange={(e) => update({ model: e.target.value })} className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text focus:outline-none focus:border-minimal-accent transition-colors duration-300">
-            {cur.models.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary mb-1.5 block">API Key</label>
-          <input type="password" value={form.apiKey} onChange={(e) => update({ apiKey: e.target.value })} placeholder="sk-..." className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300" />
+          {cur.models.length > 0 ? (
+            <div className="flex gap-2">
+              <select value={form.model} onChange={(e) => update({ model: e.target.value })} className="flex-1 px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text focus:outline-none focus:border-minimal-accent transition-colors duration-300">
+                {cur.models.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <input value={form.customModelName} onChange={(e) => update({ customModelName: e.target.value })} placeholder="或输入自定义模型名" data-testid="agent-custom-model-input" className="flex-1 px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300" />
+            </div>
+          ) : (
+            <input value={form.customModelName} onChange={(e) => update({ customModelName: e.target.value })} placeholder="输入模型名称，如 qwen3.5-9b" data-testid="agent-custom-model-input" className="w-full px-3 py-2 bg-minimal-bg dark:bg-minimal-dark-bg border border-minimal-border dark:border-minimal-dark-border rounded-lg text-sm text-minimal-text dark:text-minimal-dark-text placeholder-minimal-tertiary focus:outline-none focus:border-minimal-accent transition-colors duration-300" />
+          )}
         </div>
       </div>
       <div>
@@ -122,7 +138,7 @@ function AgentForm({ form, setForm, onSave, onCancel, isLoading, submitLabel }: 
       </div>
       <div className="flex gap-2 justify-end pt-1">
         <button onClick={onCancel} className="px-3 py-1.5 text-sm text-minimal-secondary hover:text-minimal-text transition-colors duration-300">取消</button>
-        <button onClick={onSave} disabled={!canSubmit || isLoading} className="px-4 py-1.5 text-sm bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border disabled:text-minimal-tertiary text-white rounded-lg transition-colors duration-300">{isLoading ? '保存中...' : submitLabel}</button>
+        <button onClick={onSave} disabled={!canSubmit || isLoading} data-testid="agent-save-button" className="px-4 py-1.5 text-sm bg-minimal-accent hover:bg-minimal-accent-hover disabled:bg-minimal-border disabled:text-minimal-tertiary text-white rounded-lg transition-colors duration-300">{isLoading ? '保存中...' : submitLabel}</button>
       </div>
     </div>
   );
@@ -141,12 +157,18 @@ export function AgentManagerPanel({ agents, onAdd, onUpdate, onDelete }: Props) 
 
   const startEdit = (a: AgentProfileRead) => {
     const cfg = (a.agentConfig ?? {}) as Record<string, unknown>;
+    const prov = (cfg.api_provider as string) ?? 'openai';
+    const provDef = PROVIDERS.find((p) => p.value === prov);
+    const model = (cfg.model as string) ?? '';
+    const isPredefinedModel = provDef?.models.includes(model) ?? false;
     setEditingId(a.id);
     setEditForm({
       name: a.name,
       description: a.description ?? '',
-      provider: (cfg.api_provider as string) ?? 'openai',
-      model: (cfg.model as string) ?? '',
+      provider: prov,
+      baseUrl: (cfg.base_url as string) ?? provDef?.baseUrl ?? '',
+      model: isPredefinedModel ? model : (provDef?.models[0] ?? ''),
+      customModelName: isPredefinedModel ? '' : model,
       apiKey: (cfg.api_key as string) ?? '',
       prompt: a.systemPrompt ?? '',
       tools: [],
@@ -162,12 +184,13 @@ export function AgentManagerPanel({ agents, onAdd, onUpdate, onDelete }: Props) 
   const handleSaveEdit = async () => {
     if (!editingId || !editForm.name.trim() || editLoading) return;
     setEditLoading(true);
+    const effectiveModel = editForm.customModelName.trim() || editForm.model;
     try {
       await onUpdate(editingId, {
         name: editForm.name.trim(),
         description: editForm.description.trim() || undefined,
         systemPrompt: editForm.prompt || undefined,
-        agentConfig: { api_provider: editForm.provider, api_key: editForm.apiKey, model: editForm.model, tools: editForm.tools.map((t) => ({ id: t })) },
+        agentConfig: { api_provider: editForm.provider, base_url: editForm.baseUrl, api_key: editForm.apiKey, model: effectiveModel, tools: editForm.tools.map((t) => ({ id: t })) },
       });
       cancelEdit();
     } finally {
@@ -178,14 +201,15 @@ export function AgentManagerPanel({ agents, onAdd, onUpdate, onDelete }: Props) 
   const handleAdd = async () => {
     if (!form.name.trim() || !form.apiKey.trim() || isLoading) return;
     setIsLoading(true);
+    const effectiveModel = form.customModelName.trim() || form.model;
     try {
       const result = await onAdd({
         name: form.name.trim(),
         role: 'expert',
-        adapterType: form.provider,
-        description: form.description.trim() || `${PROVIDERS.find((p) => p.value === form.provider)?.label ?? form.provider} · ${form.model}`,
+        adapterType: 'custom',
+        description: form.description.trim() || `${PROVIDERS.find((p) => p.value === form.provider)?.label ?? form.provider} · ${effectiveModel}`,
         systemPrompt: form.prompt || undefined,
-        agentConfig: { api_provider: form.provider, api_key: form.apiKey, model: form.model, tools: form.tools.map((t) => ({ id: t })) },
+        agentConfig: { api_provider: form.provider, base_url: form.baseUrl, api_key: form.apiKey, model: effectiveModel, tools: form.tools.map((t) => ({ id: t })) },
       });
       if (result) {
         setForm({ ...emptyForm });
@@ -253,7 +277,7 @@ export function AgentManagerPanel({ agents, onAdd, onUpdate, onDelete }: Props) 
       </div>
 
       {!showForm ? (
-        <button onClick={() => { setShowForm(true); cancelEdit(); }} className="w-full py-3 rounded-xl border border-dashed border-minimal-border dark:border-minimal-dark-border text-sm text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text hover:border-minimal-tertiary dark:hover:border-minimal-dark-tertiary transition-colors duration-300 flex items-center justify-center gap-2">
+        <button onClick={() => { setShowForm(true); cancelEdit(); }} data-testid="add-agent-button" className="w-full py-3 rounded-xl border border-dashed border-minimal-border dark:border-minimal-dark-border text-sm text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text hover:border-minimal-tertiary dark:hover:border-minimal-dark-tertiary transition-colors duration-300 flex items-center justify-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           添加智能体
         </button>

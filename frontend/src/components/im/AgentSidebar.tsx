@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { AgentProfile } from '@agenthub/shared/types/entities';
+import { OrchestratorVisualizer } from './OrchestratorVisualizer';
 
 interface AgentSidebarProps {
   agents: AgentProfile[];
@@ -9,6 +11,7 @@ interface AgentSidebarProps {
   width: number;
   onResizeStart: (e: React.MouseEvent) => void;
   children?: ReactNode;
+  agentStatuses?: Record<string, string>;
 }
 
 function RoleBadge({ role }: { role: 'orchestrator' | 'expert' }) {
@@ -74,7 +77,17 @@ function AgentCard({ agent }: { agent: AgentProfile }) {
   );
 }
 
-export function AgentSidebar({ agents, isOpen, width, onResizeStart, children }: AgentSidebarProps) {
+export function AgentSidebar({ agents, isOpen, width, onResizeStart, children, agentStatuses = {} }: AgentSidebarProps) {
+  const [showTopology, setShowTopology] = useState(false);
+
+  const topologyData = useMemo(() => {
+    return agents.map((a) => ({
+      id: a.id,
+      name: a.name,
+      status: (agentStatuses[a.id] as 'idle' | 'working' | 'done' | 'error') ?? 'idle',
+    }));
+  }, [agents, agentStatuses]);
+
   if (!isOpen) return null;
 
   return (
@@ -88,7 +101,17 @@ export function AgentSidebar({ agents, isOpen, width, onResizeStart, children }:
       ) : (
         <>
           <div className="p-4 border-b border-minimal-border dark:border-minimal-dark-border">
-            <h3 className="text-sm font-semibold text-minimal-text dark:text-minimal-dark-text">智能体面板</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-minimal-text dark:text-minimal-dark-text">智能体面板</h3>
+              {agents.length > 1 && (
+                <button
+                  onClick={() => setShowTopology((p) => !p)}
+                  className={`px-2 py-0.5 text-[10px] rounded transition-colors duration-200 ${showTopology ? 'bg-minimal-accent/10 text-minimal-accent' : 'bg-minimal-bg dark:bg-minimal-dark-bg text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text'}`}
+                >
+                  {showTopology ? '列表' : '拓扑'}
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-2 mt-1">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-minimal-success rounded-full" />
@@ -98,11 +121,17 @@ export function AgentSidebar({ agents, isOpen, width, onResizeStart, children }:
               <span className="text-[11px] text-minimal-secondary dark:text-minimal-dark-secondary">{agents.length} 个专家就绪</span>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600">
-            {agents.map((agent) => (
-              <AgentCard key={agent.id} agent={agent} />
-            ))}
-          </div>
+          {showTopology ? (
+            <div className="flex-1 overflow-hidden">
+              <OrchestratorVisualizer agents={topologyData} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600">
+              {agents.map((agent) => (
+                <AgentCard key={agent.id} agent={agent} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </aside>

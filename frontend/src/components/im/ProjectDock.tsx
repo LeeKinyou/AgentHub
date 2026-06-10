@@ -44,8 +44,8 @@ export function ProjectDock({ projects, activeProjectId, theme, onSelectProject,
           </button>
           {isDropdownOpen && (
             <div className="absolute left-14 top-0 z-50 w-52 bg-minimal-glass/80 dark:bg-minimal-dark-glass/80 backdrop-blur-xl border border-minimal-glass-border dark:border-minimal-dark-glass-border rounded-minimal shadow-minimal-glass py-1 shadow-minimal-glow">
-              <button onClick={() => { setIsDropdownOpen(false); onOpenProject(); }} className="w-full px-4 py-2.5 text-left text-sm text-minimal-text dark:text-minimal-dark-text hover:bg-minimal-bg dark:hover:bg-minimal-dark-bg transition-colors duration-300 flex items-center gap-2"><span>📂</span><span>打开本地项目</span></button>
-              <button onClick={() => { setIsDropdownOpen(false); onNewProject(); }} className="w-full px-4 py-2.5 text-left text-sm text-minimal-text dark:text-minimal-dark-text hover:bg-minimal-bg dark:hover:bg-minimal-dark-bg transition-colors duration-300 flex items-center gap-2"><span>✨</span><span>新建项目</span></button>
+              <button onClick={() => { setIsDropdownOpen(false); onOpenProject(); }} data-testid="open-project-button" className="w-full px-4 py-2.5 text-left text-sm text-minimal-text dark:text-minimal-dark-text hover:bg-minimal-bg dark:hover:bg-minimal-dark-bg transition-colors duration-300 flex items-center gap-2"><span>📂</span><span>打开本地项目</span></button>
+              <button onClick={() => { setIsDropdownOpen(false); onNewProject(); }} data-testid="new-project-button" className="w-full px-4 py-2.5 text-left text-sm text-minimal-text dark:text-minimal-dark-text hover:bg-minimal-bg dark:hover:bg-minimal-dark-bg transition-colors duration-300 flex items-center gap-2"><span>✨</span><span>新建项目</span></button>
             </div>
           )}
         </div>
@@ -86,6 +86,7 @@ export function ProjectDock({ projects, activeProjectId, theme, onSelectProject,
           )}
         </div>
         <button onClick={onOpenSettings}
+          data-testid="settings-button"
           className="p-2 rounded-minimal text-minimal-secondary dark:text-minimal-dark-secondary hover:text-minimal-text dark:hover:text-minimal-dark-text hover:bg-minimal-bg dark:hover:bg-minimal-dark-bg transition-colors duration-300" title="设置">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
         </button>
