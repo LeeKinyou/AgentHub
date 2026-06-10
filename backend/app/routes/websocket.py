@@ -47,6 +47,7 @@ class WebSocketSessionGuard:
         self._lock = asyncio.Lock()
         self._min_interval = min_interval_seconds
         self._last_send_time: float = 0.0
+        self._cancel_event = asyncio.Event()
 
     @asynccontextmanager
     async def message_lock(self):
@@ -66,6 +67,18 @@ class WebSocketSessionGuard:
 
     def record_send_time(self) -> None:
         self._last_send_time = time.monotonic()
+
+    def request_cancel(self) -> None:
+        """Signal that the current generation should be cancelled."""
+        self._cancel_event.set()
+
+    def is_cancelled(self) -> bool:
+        """Check if cancellation has been requested."""
+        return self._cancel_event.is_set()
+
+    def reset_cancel(self) -> None:
+        """Reset the cancellation flag for a new message."""
+        self._cancel_event.clear()
 
 
 async def build_conversation_history(
@@ -193,7 +206,23 @@ async def _handle_send_message(
             await db.commit()
 
         try:
+            guard.reset_cancel()
             async for event in orchestrator.process(session_id, content, agent_roster, conversation_history=conversation_history):
+                if guard.is_cancelled():
+                    logger.info("Generation cancelled for session %s", session_id)
+                    await websocket.send_json(S2CMessageChunk(
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        payload=MessageChunkPayload(
+                            message_id=response_message_id,
+                            session_id=session_id,
+                            agent_id=primary_agent_id,
+                            chunk_type="text",
+                            delta_content="\n\n[生成已取消]",
+                            chunk_index=0,
+                            is_final=True,
+                        ),
+                    ).model_dump(mode="json", by_alias=True))
+                    break
                 if isinstance(event, AgentStatusEvent):
                     # Update agent status in DB on terminal states
                     if event.status in ("completed", "failed"):
@@ -479,6 +508,11 @@ async def websocket_endpoint(
                 msg_type = data.get("type")
 
                 if msg_type == "ping":
+                    await websocket.send_json(S2CPong(timestamp=data.get("timestamp", "")).model_dump(mode="json", by_alias=True))
+
+                elif msg_type == "stopGeneration":
+                    logger.info("Stop generation requested for session %s", session_id)
+                    guard.request_cancel()
                     await websocket.send_json(S2CPong(timestamp=data.get("timestamp", "")).model_dump(mode="json", by_alias=True))
 
                 elif msg_type == "sendMessage":

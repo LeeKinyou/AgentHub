@@ -1,15 +1,17 @@
 import logging
 import warnings
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .core.config import get_settings
 from .core.database import engine, Base
 from .core.redis import close_redis
 from .models import SessionAgent  # noqa: F401 — ensure create_all sees it
-from .routes import agents, auth, deploy, messages, sessions, users, websocket
+from .routes import agents, auth, deploy, messages, sessions, upload, users, websocket
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,13 @@ app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sessions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(agents.router, prefix=settings.API_V1_PREFIX)
 app.include_router(messages.router, prefix=settings.API_V1_PREFIX)
+app.include_router(upload.router)
 app.include_router(deploy.router)
+
+# Serve uploaded files
+uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
+uploads_dir.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 app.include_router(websocket.router)
 
 
