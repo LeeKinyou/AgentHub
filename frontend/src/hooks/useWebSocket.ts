@@ -120,17 +120,19 @@ export function useWebSocket({ sessionId, onChunk, onMessageComplete, onAgentSta
     return cleanup;
   }, [sessionId, connect, cleanup]);
 
-  const sendMessage = useCallback((content: string): boolean => {
+  const sendMessage = useCallback((content: string, replyToId?: string): boolean => {
     if (wsRef.current?.readyState !== WebSocket.OPEN || !sessionIdRef.current) {
       // Queue for resend on reconnect (Bug #7)
       pendingMessagesRef.current.push({ content, timestamp: new Date().toISOString() });
       return false;
     }
     const timestamp = new Date().toISOString();
+    const payload: Record<string, unknown> = { sessionId: sessionIdRef.current, content };
+    if (replyToId) payload.replyToId = replyToId;
     wsRef.current.send(JSON.stringify({
       type: 'sendMessage',
       timestamp,
-      payload: { sessionId: sessionIdRef.current, content },
+      payload,
     }));
     return true;
   }, []);

@@ -156,6 +156,40 @@ export function useBackendData() {
     return null;
   }, [isAuthenticated, user]);
 
+  const updateSessionPin = useCallback(async (sessionId: string, isPinned: boolean) => {
+    if (!isAuthenticated || !user) return null;
+    try {
+      const result = await apiClient.updateSession(user.id, sessionId, { isPinned });
+      if (result.data) {
+        setState((prev) => ({
+          ...prev,
+          sessions: prev.sessions.map((s) => (s.id === sessionId ? result.data! : s)),
+        }));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to update session pin:', err);
+    }
+    return null;
+  }, [isAuthenticated, user]);
+
+  const updateSessionArchive = useCallback(async (sessionId: string, isArchived: boolean) => {
+    if (!isAuthenticated || !user) return null;
+    try {
+      const result = await apiClient.updateSession(user.id, sessionId, { isArchived });
+      if (result.data) {
+        setState((prev) => ({
+          ...prev,
+          sessions: prev.sessions.map((s) => (s.id === sessionId ? result.data! : s)),
+        }));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to update session archive:', err);
+    }
+    return null;
+  }, [isAuthenticated, user]);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchAgents();
@@ -177,6 +211,8 @@ export function useBackendData() {
     createSession,
     deleteSession,
     updateSessionTitle,
+    updateSessionPin,
+    updateSessionArchive,
     refreshAgents: fetchAgents,
     refreshSessions: fetchSessions,
   };
